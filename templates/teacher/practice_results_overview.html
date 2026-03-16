@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Practice Results</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui-system.css') }}" rel="stylesheet">
+</head>
+<body class="app-bg theme-{{ session.get('theme_mode', 'light') }} font-{{ session.get('font_scale', 'medium') }}">
+<nav class="navbar navbar-expand-lg topbar">
+    <div class="container-fluid">
+        <span class="navbar-brand">Practice Results</span>
+        <a href="{{ url_for('teacher_dashboard') }}" class="btn btn-outline-primary btn-sm">Dashboard</a>
+    </div>
+</nav>
+
+<div class="page-wrap">
+    <div class="section-hero mb-3">
+        <h2>Practice Quiz - First Attempt Results</h2>
+        <p>Only students' first-time submissions are counted.</p>
+    </div>
+
+    <div class="glass-card p-3 mb-3">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-12 col-md-9">
+                <label class="form-label mb-1">Find by Quiz Name</label>
+                <input type="text" name="q" class="form-control" placeholder="Type quiz name" value="{{ quiz_query or '' }}">
+            </div>
+            <div class="col-12 col-md-3 d-grid gap-2">
+                <button class="btn btn-brand" type="submit">Search</button>
+                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('teacher_practice_results_overview') }}">Clear</a>
+            </div>
+        </form>
+    </div>
+
+    {% if quizzes %}
+    <div class="row g-3">
+        {% for quiz in quizzes %}
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="glass-card p-3 h-100">
+                <h5 class="mb-1">{{ quiz['quiz_name'] }}</h5>
+                <div class="d-flex gap-2 flex-wrap mb-3">
+                    <span class="chip">Students: {{ quiz['first_attempt_students'] or 0 }}</span>
+                    <span class="chip">Created: {{ quiz['created_at'][:10] if quiz['created_at'] else '-' }}</span>
+                </div>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('teacher_practice_quiz_results', quiz_id=quiz['quiz_id']) }}" class="btn btn-outline-success btn-sm">View Results</a>
+                    <a href="{{ url_for('teacher_practice_quiz_results_export', quiz_id=quiz['quiz_id']) }}" class="btn btn-outline-primary btn-sm">Download Report</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="glass-card p-4">
+        <p class="mb-0">No practice quizzes found.</p>
+    </div>
+    {% endif %}
+</div>
+</body>
+</html>

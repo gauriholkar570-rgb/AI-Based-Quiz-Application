@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Live Quiz - Teacher</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui-system.css') }}" rel="stylesheet">
+<style>
+.option-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.opt {
+  border: 0;
+  border-radius: 14px;
+  padding: 12px;
+  min-height: 92px;
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  position: relative;
+}
+.opt.correct {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 4px #15803d inset, 0 0 0 2px rgba(22, 163, 74, .35);
+  filter: none;
+}
+.opt.disabled-option {
+  opacity: .45;
+  filter: grayscale(.35);
+  pointer-events: none;
+}
+.c1 { background: #ef4444; }
+.c2 { background: #2563eb; }
+.c3 { background: #f59e0b; color: #1f2937; }
+.c4 { background: #16a34a; }
+.opt-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.opt-count {
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-weight: 800;
+  border: 1px solid rgba(255,255,255,.5);
+  background: rgba(255,255,255,.16);
+}
+.c2 .opt-count { border-color: rgba(17,24,39,.25); background: rgba(255,255,255,.45); }
+.players { margin-top: 8px; font-size: .9rem; opacity: .95; font-weight: 500; }
+.rank-box { border-radius: 14px; padding: 12px; border: 1px solid var(--border); background: var(--card); }
+.rank-row { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.rank-row:last-child { margin-bottom: 0; }
+.result-board {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--card);
+}
+.bar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
+  min-height: 190px;
+}
+.bar-col { text-align: center; }
+.bar-count { font-weight: 800; margin-bottom: 6px; }
+.bar {
+  height: 40px;
+  border-radius: 8px 8px 0 0;
+  transition: height .3s ease;
+}
+.bar-opt { font-weight: 700; margin-top: 6px; font-size: .9rem; }
+.bar-red { background:#ef4444; }
+.bar-blue { background:#2563eb; }
+.bar-yellow { background:#f59e0b; }
+.bar-green { background:#16a34a; }
+.bar-correct { box-shadow: 0 0 0 3px rgba(34,197,94,.35) inset; }
+.question-media{
+  width:100%;
+  max-width:820px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  display:block;
+}
+@media (max-width: 760px) { .option-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body class="app-bg theme-{{ session.get('theme_mode', 'light') }} font-{{ session.get('font_scale', 'medium') }}">
+<nav class="navbar navbar-expand-lg topbar">
+    <div class="container-fluid">
+        <span class="navbar-brand">Quiz App</span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="chip">Session #{{ session_id }}</span>
+            {% if question %}
+            <span class="chip">Time Left: <span id="timeLeft">{{ question['time_left'] }}</span>s</span>
+            {% endif %}
+        </div>
+    </div>
+</nav>
+
+<div class="page-wrap" style="max-width:920px;">
+    <div class="glass-card p-4">
+        {% if question %}
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <span class="stat-badge">Question {{ question['question_number'] }} of {{ total_questions }}</span>
+        </div>
+        <h2 class="mb-3">{{ question['question_text'] }}</h2>
+        {% if question['media_url'] %}
+        <img class="question-media mb-3" src="{{ url_for('static', filename=question['media_url']) }}" alt="Question image">
+        {% endif %}
+
+        <div id="resultBoard" class="result-board mb-3 {% if question['phase'] != 'reveal' %}d-none{% endif %}">
+            <div class="fw-bold mb-2">Answer Distribution</div>
+            <div class="bar-grid">
+                {% for opt in options %}
+                {% set c = answer_stats.get(opt['option_text'], {}).get('count', 0) %}
+                <div class="bar-col">
+                    <div class="bar-count" id="bar_count_{{ loop.index0 }}">{{ c }}</div>
+                    <div
+                        id="bar_{{ loop.index0 }}"
+                        class="bar {% if loop.index0 == 0 %}bar-red{% elif loop.index0 == 1 %}bar-blue{% elif loop.index0 == 2 %}bar-yellow{% else %}bar-green{% endif %} {% if opt['is_correct'] == 1 %}bar-correct{% endif %}"
+                        style="height: {{ 40 + (c * 14) }}px;"
+                    ></div>
+                    <div class="bar-opt">{{ opt['option_text'] }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div id="optionsBox" class="option-grid">
+            {% for opt in options %}
+            <div class="opt c{{ (loop.index0 % 4) + 1 }} {% if question['phase'] == 'reveal' and opt['is_correct'] == 1 %}correct{% elif question['phase'] == 'reveal' %}disabled-option{% endif %}" data-text="{{ opt['option_text'] }}" data-correct="{{ opt['is_correct'] }}">
+                <div class="opt-top">
+                    <span>{{ opt['option_text'] }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div id="revealBanner" class="alert alert-success {% if question['phase'] != 'reveal' %}d-none{% endif %} mt-3">
+            Correct answer revealed.
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap mt-3 {% if question['phase'] != 'reveal' %}d-none{% endif %}" id="controls">
+            {% if has_next %}
+            <a class="btn btn-brand" href="{{ url_for('live_leaderboard', session_id=session_id) }}">Next: Scoreboard</a>
+            {% else %}
+            <a class="btn btn-outline-danger" href="{{ url_for('final_podium', session_id=session_id) }}">Show Final Podium</a>
+            {% endif %}
+        </div>
+        {% else %}
+        <h3>Quiz Finished</h3>
+        <a class="btn btn-brand mt-2" href="{{ url_for('final_podium', session_id=session_id) }}">Open Final Podium</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if question %}
+<script>
+let timeLeft = {{ question['time_left'] }};
+const options = document.querySelectorAll(".opt");
+const resultBoard = document.getElementById("resultBoard");
+const controls = document.getElementById("controls");
+const revealBanner = document.getElementById("revealBanner");
+const timerEl = document.getElementById("timeLeft");
+let revealed = {{ 'true' if question['phase'] == 'reveal' else 'false' }};
+
+function updateReveal() {
+  options.forEach((el) => {
+    if (el.dataset.correct === "1") {
+      el.classList.add("correct");
+      el.classList.remove("disabled-option");
+    } else {
+      el.classList.add("disabled-option");
+      el.classList.remove("correct");
+    }
+  });
+  controls.classList.remove("d-none");
+  revealBanner.classList.remove("d-none");
+  resultBoard.classList.remove("d-none");
+  revealed = true;
+}
+
+function tickTimer() {
+  if (revealed) return;
+  if (timeLeft > 0) {
+    timeLeft -= 1;
+    timerEl.innerText = timeLeft;
+  }
+  if (timeLeft <= 0) {
+    updateReveal();
+  }
+}
+
+function fetchCounts() {
+  fetch("/get_answer_counts/{{ session_id }}/{{ question['question_id'] }}")
+    .then(r => r.json())
+    .then(data => {
+      options.forEach((opt, i) => {
+        const txt = opt.dataset.text;
+        const state = data[txt] || {count: 0, players: []};
+        const bar = document.getElementById("bar_" + i);
+        const barCount = document.getElementById("bar_count_" + i);
+        if (bar && barCount) {
+          barCount.innerText = state.count;
+          bar.style.height = `${40 + (state.count * 14)}px`;
+        }
+      });
+    });
+}
+
+setInterval(tickTimer, 1000);
+setInterval(fetchCounts, 1600);
+fetchCounts();
+if (revealed) updateReveal();
+</script>
+{% endif %}
+</body>
+</html>

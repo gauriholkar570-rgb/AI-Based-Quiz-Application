@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Waiting Room - Teacher</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui-system.css') }}" rel="stylesheet">
+<style>
+.pin-box { font-size: clamp(2rem, 6vw, 3rem); font-weight: 800; letter-spacing: 4px; color: #0369a1; }
+.list-box { max-height: 320px; overflow-y: auto; }
+.student-pill {
+    background: #f8fdff;
+    border: 1px solid #dbeafe;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-weight: 700;
+    color: #0f172a;
+}
+body.app-bg.theme-dark .student-pill {
+    background: rgba(15, 23, 42, 0.8);
+    border-color: rgba(148, 163, 184, 0.35);
+    color: #e2e8f0;
+}
+</style>
+</head>
+<body class="app-bg theme-{{ session.get('theme_mode', 'light') }} font-{{ session.get('font_scale', 'medium') }}">
+<nav class="navbar navbar-expand-lg topbar">
+    <div class="container-fluid">
+        <span class="navbar-brand">Quiz App</span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="hello me-2">Hello, {{ session['username'] }}</span>
+            <a href="{{ url_for('teacher_dashboard') }}" class="btn btn-outline-primary btn-sm">Dashboard</a>
+        </div>
+    </div>
+</nav>
+
+<div class="page-wrap">
+    <div class="section-hero mb-3">
+        <h2>Teacher Waiting Room</h2>
+        <p>Share PIN with students and start quiz when everyone joins.</p>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-5">
+            <div class="glass-card p-4 h-100">
+                <div class="chip mb-2">Session #{{ session_id }}</div>
+                <div class="mb-2">Game PIN</div>
+                <div class="pin-box">{{ pin }}</div>
+                <p class="mt-3 mb-4">Students can join using this PIN from the Join Quiz page.</p>
+                <button id="startBtn" class="btn btn-success-solid w-100 btn-lg">Start Quiz</button>
+            </div>
+        </div>
+        <div class="col-12 col-lg-7">
+            <div class="glass-card p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3 class="m-0">Joined Students</h3>
+                    <span class="stat-badge" id="studentCount">{{ students|length }}</span>
+                </div>
+                <div id="studentList" class="list-box d-flex flex-wrap gap-2">
+                    {% for student in students %}
+                    <span class="student-pill">{{ student['nickname'] }}</span>
+                    {% else %}
+                    <p class="empty-text m-0">No students joined yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+setInterval(() => {
+    fetch("/get_students/{{ session_id }}", { method: "GET", credentials: "same-origin" })
+    .then(res => res.json())
+    .then(data => {
+        const list = document.getElementById("studentList");
+        const count = document.getElementById("studentCount");
+        count.textContent = data.students.length;
+        if (!data.students.length) {
+            list.innerHTML = '<p class="empty-text m-0">No students joined yet.</p>';
+            return;
+        }
+        list.innerHTML = data.students.map(s => `<span class="student-pill">${s.nickname}</span>`).join("");
+    });
+}, 3000);
+
+document.getElementById("startBtn").addEventListener("click", () => {
+    fetch("/start_live_quiz/{{ session_id }}", { method: "POST", credentials: "same-origin" })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = "/teacher_live_quiz/{{ session_id }}";
+        } else {
+            alert("Failed to start quiz");
+        }
+    })
+    .catch(() => alert("Could not start quiz right now."));
+});
+</script>
+</body>
+</html>

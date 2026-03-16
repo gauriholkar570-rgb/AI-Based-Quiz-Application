@@ -1,0 +1,3 @@
+postgresql://quiz_db_ngm4_user:6LkxbmujW489dU7WnDYM2hR5tvX6GQ2L@dpg-d6roaih4tr6s73a80odg-a/quiz_db_ngm4
+
+https://github.com/samikshadhawade0-prog/AI-based-Quiz-Online-application.git

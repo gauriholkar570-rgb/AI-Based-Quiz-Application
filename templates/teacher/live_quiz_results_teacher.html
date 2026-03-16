@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Results - {{ quiz['quiz_name'] }}</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui-system.css') }}" rel="stylesheet">
+</head>
+<body class="app-bg theme-{{ session.get('theme_mode', 'light') }} font-{{ session.get('font_scale', 'medium') }}">
+<nav class="navbar navbar-expand-lg topbar">
+    <div class="container-fluid">
+        <span class="navbar-brand">Live Results</span>
+        <a href="{{ url_for('teacher_live_results_overview') }}" class="btn btn-outline-primary btn-sm">Back</a>
+    </div>
+</nav>
+
+<div class="page-wrap">
+    <div class="section-hero mb-3">
+        <h2>{{ quiz['quiz_name'] }}</h2>
+        <p>Student live quiz results grouped by session.</p>
+    </div>
+
+    <div class="glass-card p-3 mb-3">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-12 col-md-5">
+                <label class="form-label mb-1">Search Student</label>
+                <input type="text" name="q" class="form-control" placeholder="Enter student name" value="{{ search_query or '' }}">
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label mb-1">Date</label>
+                <input type="date" name="date" class="form-control" value="{{ selected_date or '' }}">
+            </div>
+            <div class="col-12 col-md-3 d-grid gap-2">
+                <button class="btn btn-brand" type="submit">Apply</button>
+                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('teacher_live_quiz_results', quiz_id=quiz['quiz_id']) }}">Clear</a>
+                <a class="btn btn-outline-success btn-sm" href="{{ url_for('teacher_live_quiz_results_export', quiz_id=quiz['quiz_id']) }}">Download Excel</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-md-3">
+            <div class="glass-card p-3 h-100">
+                <div class="text-muted">Class Average</div>
+                <div class="h4 mb-0">{{ report['class_avg_score'] }}</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="glass-card p-3 h-100">
+                <div class="text-muted">Highest Score</div>
+                <div class="h4 mb-0">{{ report['highest_score'] }}</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="glass-card p-3 h-100">
+                <div class="text-muted">Lowest Score</div>
+                <div class="h4 mb-0">{{ report['lowest_score'] }}</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="glass-card p-3 h-100">
+                <div class="text-muted">Attempted / Joined</div>
+                <div class="h4 mb-0">{{ report['attempted_students'] }} / {{ report['participants_total'] }}</div>
+                <div class="text-muted small">Incomplete: {{ report['incomplete_students'] }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card p-3 mb-3">
+        <h5 class="mb-2">Date-wise + Branch-wise Students</h5>
+        {% if summary %}
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Branch</th>
+                        <th>Students Solved</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in summary %}
+                    <tr>
+                        <td>{{ row['activity_date'] }}</td>
+                        <td>{{ row['branch'] }}</td>
+                        <td><strong>{{ row['students_count'] }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="mb-0">No records for selected filter.</p>
+        {% endif %}
+    </div>
+
+    <div class="glass-card p-3">
+        {% if rows %}
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Branch</th>
+                        <th>Session</th>
+                        <th>PIN</th>
+                        <th>Student</th>
+                        <th>Score</th>
+                        <th>Attempted</th>
+                        <th>Correct</th>
+                        <th>Incorrect</th>
+                        <th>Correct %</th>
+                        <th>Time Taken</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td>{{ row['activity_date'] }}</td>
+                        <td>{{ row['branch'] }}</td>
+                        <td>#{{ row['session_id'] }}</td>
+                        <td>{{ row['pin'] }}</td>
+                        <td><a href="{{ url_for('teacher_live_student_detail', quiz_id=quiz['quiz_id'], session_id=row['session_id'], participant_id=row['participant_id'], q=search_query, date=selected_date) }}">{{ row['student_name'] }}</a></td>
+                        <td><strong>{{ row['score'] }}</strong></td>
+                        <td>{{ row['answers_count'] }}</td>
+                        <td>{{ row['correct_answers'] }}</td>
+                        <td>{{ (row['answers_count'] or 0) - (row['correct_answers'] or 0) }}</td>
+                        <td>
+                            {% if row['answers_count'] %}
+                                {{ ((row['correct_answers'] / row['answers_count']) * 100) | round(1) }}%
+                            {% else %}
+                                0%
+                            {% endif %}
+                        </td>
+                        <td>{{ row['time_taken'] }} ms</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="mb-0">No live results available yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="glass-card p-3 mt-3">
+        <h5 class="mb-2">Question Analysis</h5>
+        {% if question_stats %}
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Question</th>
+                        <th>Attempts</th>
+                        <th>Correct</th>
+                        <th>Incorrect</th>
+                        <th>Correct %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for q in question_stats %}
+                    {% set correct_rate = (q['correct_count'] / q['attempts']) if q['attempts'] else 0 %}
+                    <tr style="background-color: {% if correct_rate >= 0.8 %}#e9f7ef{% elif correct_rate >= 0.5 %}#fff7e6{% else %}#fdecea{% endif %};">
+                        <td>{{ q['question_text'] }}</td>
+                        <td>{{ q['attempts'] }}</td>
+                        <td>{{ q['correct_count'] }}</td>
+                        <td>{{ q['incorrect_count'] }}</td>
+                        <td>{{ (correct_rate * 100) | round(1) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="mb-0">No question-level data yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="row g-3 mt-3">
+        <div class="col-12 col-lg-4">
+            <div class="glass-card p-3 h-100">
+                <h6 class="mb-2">Score Distribution</h6>
+                <canvas id="liveScoreChart" height="140"></canvas>
+            </div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="glass-card p-3 h-100">
+                <h6 class="mb-2">Correct vs Incorrect</h6>
+                <canvas id="liveCorrectChart" height="140"></canvas>
+            </div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="glass-card p-3 h-100">
+                <h6 class="mb-2">Average Score by Date</h6>
+                <canvas id="liveTrendChart" height="140"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const scoreLabels = {{ report['score_labels'] | tojson }};
+const scoreValues = {{ report['score_values'] | tojson }};
+const correctTotal = {{ report['correct_total'] }};
+const incorrectTotal = {{ report['incorrect_total'] }};
+const dateLabels = {{ report['date_labels'] | tojson }};
+const dateAvgScores = {{ report['date_avg_scores'] | tojson }};
+
+if (scoreLabels.length) {
+  new Chart(document.getElementById('liveScoreChart'), {
+    type: 'bar',
+    data: {
+      labels: scoreLabels,
+      datasets: [{
+        label: 'Score',
+        data: scoreValues,
+        backgroundColor: '#2c7be5'
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+}
+
+new Chart(document.getElementById('liveCorrectChart'), {
+  type: 'pie',
+  data: {
+    labels: ['Correct', 'Incorrect'],
+    datasets: [{
+      data: [correctTotal, incorrectTotal],
+      backgroundColor: ['#2ecc71', '#e74c3c']
+    }]
+  },
+  options: { responsive: true }
+});
+
+if (dateLabels.length) {
+  new Chart(document.getElementById('liveTrendChart'), {
+    type: 'line',
+    data: {
+      labels: dateLabels,
+      datasets: [{
+        label: 'Avg Score',
+        data: dateAvgScores,
+        borderColor: '#17a2b8',
+        backgroundColor: 'rgba(23, 162, 184, 0.2)',
+        tension: 0.2
+      }]
+    },
+    options: { responsive: true }
+  });
+}
+</script>
+</body>
+</html>

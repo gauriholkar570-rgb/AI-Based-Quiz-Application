@@ -1,0 +1,207 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Create Quiz - Quiz App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui-system.css') }}" rel="stylesheet">
+</head>
+<body class="app-bg">
+<nav class="navbar navbar-expand-lg topbar">
+    <div class="container-fluid">
+        <span class="navbar-brand">Quiz App</span>
+        <a href="{{ url_for('teacher_dashboard') }}" class="btn btn-outline-primary btn-sm">Back to Dashboard</a>
+    </div>
+</nav>
+
+<div class="page-wrap">
+    <div class="section-hero mb-3">
+        <h1>Create {{ quiz_type|capitalize }} Quiz</h1>
+        <p>Design a game-ready quiz with fast controls and clean structure.</p>
+    </div>
+
+    <div class="glass-card p-4 module-form">
+        <form method="POST" action="{{ url_for('create_quiz', quiz_type=quiz_type) }}" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label class="form-label">Quiz Title</label>
+                <input type="text" name="title" class="form-control form-control-lg" placeholder="Quiz title" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea name="description" class="form-control" rows="2" placeholder="Optional description"></textarea>
+            </div>
+            {% if quiz_type != 'live' %}
+            <div class="mb-3">
+                <label class="form-label">Time per question (seconds)</label>
+                <input type="number" name="time_per_question" class="form-control" value="20" min="5" required>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                Set a separate timer for each question in a live quiz.
+            </div>
+            {% endif %}
+
+            {% if quiz_type == 'practice' %}
+            <label class="form-label mb-2">Target Departments</label>
+            <div class="d-flex flex-wrap gap-3 mb-3">
+                <div class="form-check"><input class="form-check-input dept-checkbox" type="checkbox" name="departments" value="Computer" id="cqDeptComputer"><label class="form-check-label" for="cqDeptComputer">Computer</label></div>
+                <div class="form-check"><input class="form-check-input dept-checkbox" type="checkbox" name="departments" value="Mechanical" id="cqDeptMechanical"><label class="form-check-label" for="cqDeptMechanical">Mechanical</label></div>
+                <div class="form-check"><input class="form-check-input dept-checkbox" type="checkbox" name="departments" value="Electrical" id="cqDeptElectrical"><label class="form-check-label" for="cqDeptElectrical">Electrical</label></div>
+                <div class="form-check"><input class="form-check-input dept-checkbox" type="checkbox" name="departments" value="Civil" id="cqDeptCivil"><label class="form-check-label" for="cqDeptCivil">Civil</label></div>
+            </div>
+            {% endif %}
+
+            <div class="quiz-editor-card mb-3">
+                <h6 class="mb-3">Generate Questions with AI</h6>
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-7">
+                        <label class="form-label">Topic</label>
+                        <input type="text" id="aiTopic" class="form-control" placeholder="Example: Python loops">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">No. of Questions</label>
+                        <input type="number" id="aiCount" class="form-control" min="1" max="20" value="5">
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button type="button" id="aiGenerateBtn" class="btn btn-outline-success">Generate</button>
+                    </div>
+                </div>
+                <div id="aiStatus" class="small mt-2 text-muted">API key नसेल तर generator चालणार नाही. `OPENAI_API_KEY` set केल्यावर लगेच काम करेल.</div>
+            </div>
+            
+            <div id="questions" class="d-grid gap-3"></div>
+
+            <div class="d-grid gap-2 mt-3">
+                <button type="button" class="btn btn-outline-primary" onclick="addQuestion()">+ Add Another Question</button>
+                <button type="submit" class="btn btn-brand">Save Quiz</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let index = 1;
+const isPracticeQuiz = {{ 'true' if quiz_type == 'practice' else 'false' }};
+const isLiveQuiz = {{ 'true' if quiz_type == 'live' else 'false' }};
+
+function addQuestion() {
+    addQuestionCard(null);
+}
+
+function esc(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function addQuestionCard(prefill) {
+    const questionText = esc(prefill?.question || "");
+    const options = Array.isArray(prefill?.options) && prefill.options.length === 4
+        ? prefill.options.map((o) => esc(o))
+        : ["", "", "", ""];
+    const correctOption = ["A", "B", "C", "D"].includes(prefill?.correct_option)
+        ? prefill.correct_option
+        : "A";
+
+    const timerField = isLiveQuiz ? `
+        <div class="mb-2">
+            <label class="form-label">Timer for this question (seconds)</label>
+            <input type="number" name="question_time_limit[]" class="form-control" value="20" min="5" max="300" required>
+        </div>
+    ` : ``;
+
+    const div = document.createElement("div");
+    div.className = "quiz-editor-card";
+    div.innerHTML = `
+        <h6 class="mb-3">Question ${index + 1}</h6>
+        <input type="text" name="question[]" class="form-control mb-2" placeholder="Enter question" value="${questionText}" required>
+        <input type="file" name="question_image[]" class="form-control mb-2" accept="image/*">
+        ${timerField}
+
+        <div class="option-line mb-2">
+            <input type="radio" name="correct_option[${index}]" value="A" ${correctOption === "A" ? "checked" : ""} required>
+            <input type="text" name="option_a[]" class="form-control" placeholder="Option A" value="${options[0]}" required>
+        </div>
+        <div class="option-line mb-2">
+            <input type="radio" name="correct_option[${index}]" value="B" ${correctOption === "B" ? "checked" : ""}>
+            <input type="text" name="option_b[]" class="form-control" placeholder="Option B" value="${options[1]}" required>
+        </div>
+        <div class="option-line mb-2">
+            <input type="radio" name="correct_option[${index}]" value="C" ${correctOption === "C" ? "checked" : ""}>
+            <input type="text" name="option_c[]" class="form-control" placeholder="Option C" value="${options[2]}" required>
+        </div>
+        <div class="option-line">
+            <input type="radio" name="correct_option[${index}]" value="D" ${correctOption === "D" ? "checked" : ""}>
+            <input type="text" name="option_d[]" class="form-control" placeholder="Option D" value="${options[3]}" required>
+        </div>
+    `;
+    document.getElementById("questions").appendChild(div);
+    index++;
+}
+
+async function generateWithAI() {
+    const btn = document.getElementById("aiGenerateBtn");
+    const status = document.getElementById("aiStatus");
+    const topic = (document.getElementById("aiTopic").value || "").trim();
+    const count = parseInt(document.getElementById("aiCount").value || "5", 10);
+
+    if (!topic) {
+        status.className = "small mt-2 text-danger";
+        status.textContent = "Topic टाका.";
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Generating...";
+    status.className = "small mt-2 text-muted";
+    status.textContent = "AI questions तयार होत आहेत...";
+
+    try {
+        const resp = await fetch("/api/ai/generate-questions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                topic: topic,
+                num_questions: Number.isFinite(count) ? count : 5
+            })
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) {
+            throw new Error(data.error || "Failed to generate questions.");
+        }
+
+        const questionsEl = document.getElementById("questions");
+        questionsEl.innerHTML = "";
+        index = 0;
+        (data.questions || []).forEach((q) => addQuestionCard(q));
+
+        status.className = "small mt-2 text-success";
+        status.textContent = `${(data.questions || []).length} questions generated successfully.`;
+    } catch (err) {
+        status.className = "small mt-2 text-danger";
+        status.textContent = err.message || "AI generation failed.";
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Generate";
+    }
+}
+
+document.querySelector('form').addEventListener('submit', function(e) {
+    if (!isPracticeQuiz) return;
+    const selected = document.querySelectorAll('.dept-checkbox:checked');
+    if (selected.length === 0) {
+        e.preventDefault();
+        alert('Please select at least one department.');
+    }
+});
+
+document.getElementById("aiGenerateBtn").addEventListener("click", generateWithAI);
+addQuestion();
+</script>
+
+</body>
+</html>

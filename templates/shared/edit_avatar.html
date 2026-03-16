@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Avatar</title>
+    <style>
+        body {
+            background: #fffc00; /* Snapchat yellow */
+            text-align: center;
+            font-family: Arial;
+        }
+
+        .avatar-container {
+            background: white;
+            width: 350px;
+            margin: 50px auto;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0px 5px 20px rgba(0,0,0,0.2);
+        }
+
+        canvas {
+            border-radius: 50%;
+            background: #eee;
+            margin-bottom: 15px;
+        }
+
+        select, button {
+            margin: 8px;
+            padding: 8px;
+            border-radius: 8px;
+            border: none;
+        }
+
+        button {
+            background: black;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #333;
+        }
+    </style>
+</head>
+<body>
+
+<div class="avatar-container">
+    <h2>Create Your Avatar 👻</h2>
+
+    <canvas id="avatarCanvas" width="250" height="250"></canvas>
+
+    <div>
+        <select id="faceColor" onchange="drawAvatar()">
+            <option value="#f1c27d">Light</option>
+            <option value="#e0ac69">Medium</option>
+            <option value="#8d5524">Dark</option>
+        </select>
+
+        <select id="eyeType" onchange="drawAvatar()">
+            <option value="normal">Normal Eyes</option>
+            <option value="happy">Happy Eyes</option>
+        </select>
+
+        <select id="mouthType" onchange="drawAvatar()">
+            <option value="smile">Smile</option>
+            <option value="sad">Sad</option>
+        </select>
+    </div>
+
+    <button onclick="drawAvatar()">Preview</button>
+    <button onclick="saveAvatar()">Save Avatar</button>
+</div>
+
+<script>
+function drawAvatar() {
+    const canvas = document.getElementById("avatarCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const faceColor = document.getElementById("faceColor").value;
+    const eyeType = document.getElementById("eyeType").value;
+    const mouthType = document.getElementById("mouthType").value;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Face
+    ctx.beginPath();
+    ctx.arc(125, 125, 100, 0, Math.PI * 2);
+    ctx.fillStyle = faceColor;
+    ctx.fill();
+
+    // Eyes
+    ctx.fillStyle = "black";
+    ctx.lineWidth = 3;
+
+    if (eyeType === "normal") {
+        ctx.fillRect(90, 100, 15, 15);
+        ctx.fillRect(145, 100, 15, 15);
+    } else {
+        ctx.beginPath();
+        ctx.arc(97, 110, 10, 0, Math.PI);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(152, 110, 10, 0, Math.PI);
+        ctx.stroke();
+    }
+
+    // Mouth
+    ctx.beginPath();
+    if (mouthType === "smile") {
+        ctx.arc(125, 160, 40, 0, Math.PI);
+    } else {
+        ctx.arc(125, 200, 40, Math.PI, 0);
+    }
+    ctx.stroke();
+}
+
+/* 🔥 SAVE AVATAR */
+function saveAvatar() {
+    const canvas = document.getElementById("avatarCanvas");
+    const imageData = canvas.toDataURL("image/png");
+
+    fetch("/save_avatar", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ image: imageData })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert("Avatar Saved Successfully 🎉");
+            window.location.href = "/student_dashboard";
+        } else {
+            alert("Error saving avatar");
+        }
+    });
+}
+
+// Draw avatar on page load
+window.onload = drawAvatar;
+</script>
+
+<form method="POST" action="{{ url_for('save_avatar') }}">
+    <input type="hidden" name="avatar_data" id="avatarData">
+
+    <button type="button" onclick="previewAvatar()">Preview</button>
+
+    <button type="submit">💾 Save Avatar</button>
+</form>
+
+<br>
+
+<a href="{{ url_for('profile') }}">
+    <button type="button">⬅ Previous</button>
+</a>
+
+</body>
+</html>

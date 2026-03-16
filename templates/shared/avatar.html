@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Full-Body Snapchat-Style Avatar Builder</title>
+<style>
+body{
+  font-family: 'Arial', sans-serif;
+  text-align:center;
+  background: linear-gradient(135deg,#fceabb,#f8b500);
+  padding:40px;
+  transition: background 0.5s;
+}
+.card{
+  background:white;
+  width:520px;
+  margin:auto;
+  padding:30px;
+  border-radius:25px;
+  box-shadow:0 20px 40px rgba(0,0,0,0.25);
+}
+#avatar{
+  width:300px;
+  height:400px;
+  margin:auto;
+  margin-bottom:20px;
+}
+select,input[type=color],button{
+  padding:10px;
+  margin:6px;
+  border-radius:12px;
+  font-size:14px;
+  border:1px solid #ccc;
+}
+button{
+  font-weight:bold;
+  border:none;
+  cursor:pointer;
+}
+button:hover{
+  opacity:0.85;
+}
+.rand{background:#ff5e62;color:white;}
+.save{background:#28a745;color:white;}
+.row{margin:12px;}
+h2{
+  margin-bottom:25px;
+  font-family:'Comic Sans MS',cursive;
+}
+</style>
+</head>
+<body>
+
+<div class="card">
+<h2>🎭 Full-Body Avatar Builder</h2>
+<div id="avatar"></div>
+
+<div class="row">Gender:
+<select id="gender">
+<option value="male">Boy</option>
+<option value="female">Girl</option>
+</select>
+</div>
+
+<div class="row">Hair Style:
+<select id="hairStyle">
+<option value="short">Short</option>
+<option value="long">Long</option>
+<option value="curly">Curly</option>
+<option value="bun">Bun</option>
+</select>
+</div>
+
+<div class="row">Expression:
+<select id="mouth">
+<option value="smile">Smile</option>
+<option value="big">Big Smile</option>
+<option value="wow">Surprise</option>
+<option value="sad">Sad</option>
+</select>
+</div>
+
+<div class="row">Eye Color:
+<input type="color" id="eyeColor" value="#4a3f35">
+</div>
+
+<div class="row">Clothes Color:
+<input type="color" id="shirtColor" value="#ff6b6b">
+</div>
+
+<div class="row">Accessories:
+<input type="checkbox" id="glasses"> Glasses
+<input type="checkbox" id="hat"> Hat
+</div>
+
+<div class="row">Background:
+<input type="color" id="bgColor1" value="#fceabb">
+<input type="color" id="bgColor2" value="#f8b500">
+</div>
+
+<button class="rand" onclick="randomize()">🎲 Random</button>
+<button class="save" onclick="saveAvatar()">✅ Save</button>
+</div>
+
+<script>
+const hairs=["#000","#3b2f2f","#6b4423","#d4a373","#b5651d"];
+
+function r(a){return a[Math.floor(Math.random()*a.length)];}
+
+function draw(){
+  let gender=document.getElementById("gender").value;
+  let hairStyle=document.getElementById("hairStyle").value;
+  let mouthType=document.getElementById("mouth").value;
+  let glasses=document.getElementById("glasses").checked;
+  let hat=document.getElementById("hat").checked;
+  let eyeColor=document.getElementById("eyeColor").value;
+  let shirtColor=document.getElementById("shirtColor").value;
+  let hairColor=r(hairs);
+  let bg1=document.getElementById("bgColor1").value;
+  let bg2=document.getElementById("bgColor2").value;
+
+  document.body.style.background=`linear-gradient(135deg, ${bg1}, ${bg2})`;
+
+  // Hair
+  let hairSVG="";
+  if(hairStyle==="short")
+    hairSVG=`<path d="M90,70 Q100,20 160,70 Q140,40 100,70" fill="${hairColor}" />`;
+  if(hairStyle==="long")
+    hairSVG=`<path d="M80,70 Q100,10 160,70 Q150,60 150,180 Q100,200 90,180 Q80,60 80,70" fill="${hairColor}" />`;
+  if(hairStyle==="curly")
+    hairSVG=`<circle cx="90" cy="50" r="15" fill="${hairColor}"/>
+             <circle cx="120" cy="40" r="18" fill="${hairColor}"/>
+             <circle cx="150" cy="50" r="15" fill="${hairColor}"/>`;
+  if(hairStyle==="bun")
+    hairSVG=`<circle cx="120" cy="40" r="25" fill="${hairColor}"/>
+             <path d="M80,70 Q120,20 160,70" fill="${hairColor}"/>`;
+
+  // Mouth
+  let mouthSVG="";
+  if(mouthType==="smile")
+    mouthSVG=`<path d="M90 150 Q120 170 150 150" stroke="#000" fill="none" stroke-width="3" stroke-linecap="round"/>`;
+  if(mouthType==="big")
+    mouthSVG=`<ellipse cx="120" cy="155" rx="20" ry="12" fill="#000"/>`;
+  if(mouthType==="wow")
+    mouthSVG=`<ellipse cx="120" cy="155" rx="10" ry="15" fill="#000"/>`;
+  if(mouthType==="sad")
+    mouthSVG=`<path d="M90 160 Q120 140 150 160" stroke="#000" fill="none" stroke-width="3" stroke-linecap="round"/>`;
+
+  // Glasses & Hat
+  let glassesSVG= glasses ? `<rect x="95" y="95" width="30" height="16" fill="none" stroke="#000" stroke-width="2"/>
+                             <rect x="135" y="95" width="30" height="16" fill="none" stroke="#000" stroke-width="2"/>
+                             <line x1="125" y1="103" x2="135" y2="103" stroke="#000" stroke-width="2"/>` : "";
+  let hatSVG= hat ? `<path d="M80,70 Q120,0 160,70 Q150,30 90,30 Z" fill="red"/>` : "";
+
+  // Full-body SVG
+  const svg=`
+  <svg viewBox="0 0 300 400">
+    <!-- Legs -->
+    <rect x="105" y="280" width="30" height="70" rx="10" fill="#888"/>
+    <rect x="155" y="280" width="30" height="70" rx="10" fill="#888"/>
+    <!-- Torso -->
+    <rect x="90" y="180" width="90" height="100" rx="20" fill="${shirtColor}" />
+    <!-- Neck -->
+    <rect x="120" y="150" width="30" height="30" rx="5" fill="#FFD7B5"/>
+    <!-- Head -->
+    <ellipse cx="135" cy="100" rx="50" ry="60" fill="#FFD7B5" />
+    ${hairSVG}
+    <!-- Eyes -->
+    <circle cx="115" cy="90" r="8" fill="${eyeColor}"/>
+    <circle cx="155" cy="90" r="8" fill="${eyeColor}"/>
+    ${mouthSVG}
+    ${glassesSVG}
+    ${hatSVG}
+  </svg>
+  `;
+
+  document.getElementById("avatar").innerHTML=svg;
+}
+
+function randomize(){
+  document.getElementById("gender").selectedIndex=Math.floor(2*Math.random());
+  document.getElementById("hairStyle").selectedIndex=Math.floor(4*Math.random());
+  document.getElementById("mouth").selectedIndex=Math.floor(4*Math.random());
+  document.getElementById("glasses").checked=Math.random()>0.5;
+  document.getElementById("hat").checked=Math.random()>0.5;
+  document.getElementById("eyeColor").value=`#${Math.floor(Math.random()*16777215).toString(16)}`;
+  document.getElementById("shirtColor").value=`#${Math.floor(Math.random()*16777215).toString(16)}`;
+  document.getElementById("bgColor1").value=`#${Math.floor(Math.random()*16777215).toString(16)}`;
+  document.getElementById("bgColor2").value=`#${Math.floor(Math.random()*16777215).toString(16)}`;
+  draw();
+}
+
+function saveAvatar(){
+  const svg=document.getElementById("avatar").innerHTML;
+  fetch("/save_avatar",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({svg:svg})
+  })
+  .then(r=>r.json())
+  .then(()=>window.location.href="/settings");
+}
+
+document.querySelectorAll("select,input").forEach(el=>el.onchange=draw);
+draw();
+</script>
+</body>
+</html>

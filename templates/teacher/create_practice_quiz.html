@@ -1,0 +1,118 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Create Practice Quiz</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui-system.css') }}" rel="stylesheet">
+<script>
+function createQuestionCard(index){
+  return `
+  <div class="quiz-editor-card">
+    <div class="fw-semibold mb-2">Question ${index + 1}</div>
+    <input class="form-control mb-2" name="question_text[]" placeholder="Enter question text" required>
+    <input class="form-control mb-2" type="file" name="question_image[]" accept="image/*">
+    <textarea class="form-control mb-2" name="explanation[]" rows="2" placeholder="Explanation (optional)"></textarea>
+
+    <label class="option-line mb-2"><input type="radio" name="correct_option_${index}" value="A" required><span>A</span><input type="text" name="option_A_${index}" placeholder="Option A" required></label>
+    <label class="option-line mb-2"><input type="radio" name="correct_option_${index}" value="B"><span>B</span><input type="text" name="option_B_${index}" placeholder="Option B" required></label>
+    <label class="option-line mb-2"><input type="radio" name="correct_option_${index}" value="C"><span>C</span><input type="text" name="option_C_${index}" placeholder="Option C" required></label>
+    <label class="option-line"><input type="radio" name="correct_option_${index}" value="D"><span>D</span><input type="text" name="option_D_${index}" placeholder="Option D" required></label>
+
+    <button type="button" class="btn btn-outline-danger w-100 mt-2" onclick="removeQuestion(this)">Remove Question</button>
+  </div>`;
+}
+
+function reindexQuestions(){
+  const cards = document.querySelectorAll('#questions .quiz-editor-card');
+  cards.forEach((card, idx) => {
+    card.querySelector('.fw-semibold').textContent = `Question ${idx + 1}`;
+    card.querySelectorAll('input[type="radio"]').forEach((r) => { r.name = `correct_option_${idx}`; });
+    ['A','B','C','D'].forEach((label) => {
+      const txt = card.querySelector(`input[name^="option_${label}_"]`);
+      if (txt) txt.name = `option_${label}_${idx}`;
+    });
+  });
+}
+
+function addQuestion(){
+  const holder = document.getElementById('questions');
+  const idx = holder.querySelectorAll('.quiz-editor-card').length;
+  holder.insertAdjacentHTML('beforeend', createQuestionCard(idx));
+}
+
+function removeQuestion(btn){
+  btn.closest('.quiz-editor-card').remove();
+  reindexQuestions();
+}
+
+function validateForm(){
+  const title = document.getElementById('title').value.trim();
+  const cards = document.querySelectorAll('#questions .quiz-editor-card');
+  const selectedDepartments = document.querySelectorAll('input[name="departments"]:checked');
+
+  if (!title){ Swal.fire('Error','Please enter quiz title','error'); return false; }
+  if (selectedDepartments.length === 0){ Swal.fire('Error','Select at least one department','error'); return false; }
+  if (cards.length === 0){ Swal.fire('Error','Add at least one question','error'); return false; }
+
+  for (let i=0;i<cards.length;i++){
+    const qText = cards[i].querySelector('input[name="question_text[]"]').value.trim();
+    if (!qText){ Swal.fire('Error',`Question ${i+1} is empty`,'error'); return false; }
+    const checked = cards[i].querySelector(`input[name="correct_option_${i}"]:checked`);
+    if (!checked){ Swal.fire('Error',`Select correct option for Question ${i+1}`,'error'); return false; }
+  }
+  return true;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (!document.querySelector('#questions .quiz-editor-card')) addQuestion();
+});
+</script>
+</head>
+<body class="app-bg">
+<nav class="navbar navbar-expand-lg topbar">
+    <div class="container-fluid">
+        <span class="navbar-brand">Create Practice Quiz</span>
+        <a href="{{ url_for('teacher_dashboard') }}" class="btn btn-outline-primary btn-sm">Back to Dashboard</a>
+    </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="section-hero mb-3">
+      <h1>Create Practice Quiz</h1>
+      <p>Build department-targeted modules with consistent game-style presentation.</p>
+  </div>
+
+  <div class="glass-card p-4 module-form">
+    <form method="POST" onsubmit="return validateForm()" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label class="form-label" for="title">Quiz Title</label>
+        <input id="title" type="text" class="form-control" name="title" placeholder="Operating Systems Practice" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="description">Description</label>
+        <textarea id="description" class="form-control" name="description" rows="2" placeholder="Optional description"></textarea>
+      </div>
+
+      <label class="form-label mb-2">Target Departments</label>
+      <div class="d-flex flex-wrap gap-3 mb-3">
+        <label class="form-check"><input class="form-check-input" type="checkbox" name="departments" value="Computer"> Computer</label>
+        <label class="form-check"><input class="form-check-input" type="checkbox" name="departments" value="Mechanical"> Mechanical</label>
+        <label class="form-check"><input class="form-check-input" type="checkbox" name="departments" value="Electrical"> Electrical</label>
+        <label class="form-check"><input class="form-check-input" type="checkbox" name="departments" value="Civil"> Civil</label>
+      </div>
+
+      <div id="questions" class="d-grid gap-3"></div>
+
+      <div class="d-grid gap-2 mt-3">
+        <button type="button" class="btn btn-outline-primary" onclick="addQuestion()">+ Add Question</button>
+        <button type="submit" class="btn btn-brand">Save Practice Quiz</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js"></script>
+</body>
+</html>

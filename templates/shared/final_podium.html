@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Final Podium</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+body{
+  margin:0;
+  min-height:100vh;
+  color:#fff;
+  font-family:'Segoe UI',sans-serif;
+  background:
+    radial-gradient(circle at 10% 15%, rgba(255,255,255,.12), transparent 30%),
+    radial-gradient(circle at 85% 25%, rgba(255,255,255,.09), transparent 30%),
+    linear-gradient(135deg,#2b0e8c,#4f1fbf 55%, #6d28d9);
+}
+.wrap{max-width:920px;margin:28px auto;text-align:center;padding:0 12px;}
+.title-box{
+  width:fit-content;margin:0 auto 16px;background:#fff;color:#111827;
+  font-weight:800;padding:7px 14px;border-radius:4px;
+}
+.podium{
+  margin-top:20px;
+  display:flex;
+  justify-content:center;
+  align-items:flex-end;
+  gap:14px;
+  flex-wrap:wrap;
+}
+.block{
+  width:190px;
+  border-radius:14px 14px 0 0;
+  padding:10px 10px 14px;
+  background:rgba(255,255,255,.16);
+  border:1px solid rgba(255,255,255,.24);
+  box-shadow:0 12px 24px rgba(0,0,0,.25);
+}
+.first{height:300px;background:rgba(255,215,0,.22);}
+.second{height:250px;background:rgba(148,163,184,.25);}
+.third{height:220px;background:rgba(251,146,60,.25);}
+.avatar{
+  width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid #fff;margin:8px auto;
+}
+.rank{font-size:1.15rem;font-weight:800;margin:0;}
+.name{font-weight:700;margin-top:8px;}
+.score{font-weight:800;font-size:1.2rem;}
+.actions{margin-top:20px;display:flex;justify-content:center;gap:8px;flex-wrap:wrap;}
+.student-result{
+  max-width:560px;
+  margin:18px auto 0;
+  border-radius:14px;
+  padding:14px 14px 12px;
+  background:rgba(255,255,255,.18);
+  border:1px solid rgba(255,255,255,.32);
+  box-shadow:0 10px 22px rgba(0,0,0,.25);
+}
+.sr-title{font-size:1.25rem;font-weight:800;margin:0;}
+.sr-line{margin:6px 0 0;font-size:1rem;}
+.share-actions{margin-top:10px;display:flex;justify-content:center;gap:8px;flex-wrap:wrap;}
+@media (max-width: 768px){
+  .first,.second,.third{height:auto;min-height:190px}
+  .block{width:100%;max-width:320px;border-radius:14px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="title-box">Final Top 3</div>
+  <h3 class="mb-1">Meet the Winners</h3>
+  <p class="mb-0">Live quiz completed successfully.</p>
+
+  <div class="podium">
+    {% if podium|length > 1 %}
+    <div class="block second">
+      <p class="rank">#2</p>
+      <img src="{{ podium[1]['avatar'] }}" class="avatar" alt="2nd place">
+      <div class="name">{{ podium[1]['player_name'] }}</div>
+      <div class="score">{{ podium[1]['score'] }}</div>
+    </div>
+    {% endif %}
+
+    {% if podium|length > 0 %}
+    <div class="block first">
+      <p class="rank">#1</p>
+      <img src="{{ podium[0]['avatar'] }}" class="avatar" alt="1st place">
+      <div class="name">{{ podium[0]['player_name'] }}</div>
+      <div class="score">{{ podium[0]['score'] }}</div>
+    </div>
+    {% endif %}
+
+    {% if podium|length > 2 %}
+    <div class="block third">
+      <p class="rank">#3</p>
+      <img src="{{ podium[2]['avatar'] }}" class="avatar" alt="3rd place">
+      <div class="name">{{ podium[2]['player_name'] }}</div>
+      <div class="score">{{ podium[2]['score'] }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if role == 'Student' %}
+  <div class="student-result" id="studentResultCard">
+    <p class="sr-title">Hi {{ student_result['player_name'] if student_result else 'Student' }}!</p>
+    <p class="sr-line">
+      Your Place:
+      <strong>
+        {% if student_result and student_result['rank'] %}
+        #{{ student_result['rank'] }}
+        {% else %}
+        -
+        {% endif %}
+      </strong>
+      out of {{ student_result['total_players'] if student_result else podium|length }}
+    </p>
+    <p class="sr-line">Your Score: <strong>{{ student_result['score'] if student_result else 0 }}</strong></p>
+    <p class="sr-line"><strong>{{ student_result['message'] if student_result else 'Well played!' }}</strong></p>
+    <div class="share-actions">
+      <button class="btn btn-light btn-sm" type="button" id="saveResultBtn">Save Screen</button>
+      <button class="btn btn-outline-light btn-sm" type="button" id="shareResultBtn">Share</button>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="actions">
+    {% if role == 'Teacher' %}
+    <a class="btn btn-light" href="{{ dashboard_url }}">Back to Teacher Dashboard</a>
+    {% else %}
+    <a class="btn btn-light" href="{{ dashboard_url }}">Back to Student Dashboard</a>
+    {% endif %}
+  </div>
+</div>
+{% if role == 'Student' %}
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+const shareText = "I finished the live quiz at #{{ student_result['rank'] if student_result and student_result['rank'] else '-' }} with {{ student_result['score'] if student_result else 0 }} points. {{ student_result['message'] if student_result else 'Well played!' }}";
+const card = document.getElementById("studentResultCard");
+const saveBtn = document.getElementById("saveResultBtn");
+const shareBtn = document.getElementById("shareResultBtn");
+
+async function captureCard() {
+  if (!window.html2canvas) return null;
+  const canvas = await window.html2canvas(card, {backgroundColor: null, scale: 2});
+  return canvas;
+}
+
+saveBtn?.addEventListener("click", async () => {
+  try {
+    const canvas = await captureCard();
+    if (!canvas) {
+      alert("Save not supported right now.");
+      return;
+    }
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png");
+    link.download = "quiz-result.png";
+    link.click();
+  } catch (_) {
+    alert("Could not save image.");
+  }
+});
+
+shareBtn?.addEventListener("click", async () => {
+  try {
+    if (navigator.share) {
+      await navigator.share({title: "Quiz Result", text: shareText});
+      return;
+    }
+    await navigator.clipboard.writeText(shareText);
+    alert("Result text copied. You can share it.");
+  } catch (_) {
+    alert("Could not share right now.");
+  }
+});
+</script>
+{% endif %}
+</body>
+</html>

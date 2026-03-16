@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Live Quiz - Quiz App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+body { background:#74b9ff; font-family:'Segoe UI',sans-serif; }
+.container { margin-top:30px; }
+.card { border-radius:15px; box-shadow:0 8px 20px rgba(0,0,0,0.3); padding:20px; margin-bottom:20px; }
+.btn-option { background:#fd79a8; color:#fff; margin-top:10px; width:100%; font-size:1rem; }
+.btn-option:hover { background:#e84393; }
+.timer { font-size:1.2rem; font-weight:bold; text-align:right; color:#2d3436; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h3 class="text-center text-white mb-4">Live Quiz</h3>
+
+    <div class="timer" id="timer">Time Left: 20</div>
+
+    <form id="quizForm" method="POST" action="/submit_answer/{{ session_id }}">
+        {% for q in quiz_questions %}
+        <div class="card" id="question-{{ loop.index0 }}" {% if loop.index0 != 0 %}style="display:none"{% endif %}>
+            <h5>{{ q.question_text }}</h5>
+            {% for opt in q.options %}
+            <button type="button" class="btn btn-option" onclick="selectOption({{ loop.index0 }}, {{ opt.id }})">{{ opt.text }}</button>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </form>
+</div>
+
+<script>
+let currentQuestion = 0;
+let totalQuestions = {{ quiz_questions|length }};
+let timeLeft = 20; // seconds
+let timerElement = document.getElementById("timer");
+
+function startTimer() {
+    timerElement.innerText = "Time Left: " + timeLeft;
+    if (timeLeft > 0) {
+        timeLeft--;
+        setTimeout(startTimer, 1000);
+    } else {
+        nextQuestion();
+    }
+}
+
+function nextQuestion() {
+    // Hide current question
+    document.getElementById("question-" + currentQuestion).style.display = "none";
+    currentQuestion++;
+    timeLeft = 20;
+
+    if (currentQuestion < totalQuestions) {
+        document.getElementById("question-" + currentQuestion).style.display = "block";
+        startTimer();
+    } else {
+        // Quiz finished
+        document.getElementById("quizForm").submit();
+    }
+}
+
+function selectOption(qIndex, optionId) {
+    // Save selection in a hidden input
+    let input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "answers[" + qIndex + "]";
+    input.value = optionId;
+    document.getElementById("quizForm").appendChild(input);
+
+    // Move to next question
+    nextQuestion();
+}
+
+// Start timer for first question
+startTimer();
+</script>
+
+</body>
+</html>

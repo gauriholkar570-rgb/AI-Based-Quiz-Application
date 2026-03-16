@@ -1,0 +1,109 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Learning</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui-system.css') }}" rel="stylesheet">
+</head>
+<body class="app-bg theme-{{ session.get('theme_mode', 'light') }} font-{{ session.get('font_scale', 'medium') }}">
+<nav class="navbar navbar-expand-lg topbar">
+    <div class="container-fluid">
+        <span class="navbar-brand" id="pageTitleNav">Daily Learning</span>
+        <a href="{{ '/teacher_dashboard' if session.get('role') == 'Teacher' else '/student_dashboard' }}" class="btn btn-outline-primary btn-sm" id="backBtnText">Back</a>
+    </div>
+</nav>
+
+<div class="page-wrap" style="max-width:900px;">
+    <div class="section-hero mb-3">
+        <h1 id="pageTitle">Daily Learning</h1>
+        <p id="todayTipSubtitle">Build streaks and earn reward points with one daily tip.</p>
+    </div>
+
+    <div class="glass-card p-4 p-md-5">
+        <div class="d-flex justify-content-between flex-wrap gap-2 mb-3">
+            <div>
+                <span class="chip" id="tipType">Type: -</span>
+                <span class="chip" id="tipSubject">Subject: -</span>
+                <span class="chip" id="tipDifficulty">Difficulty: -</span>
+            </div>
+            <div class="d-flex gap-2">
+                <select id="langSelect" class="form-select form-select-sm" style="width: 120px;">
+                    <option value="en">English</option>
+                    <option value="hi">Hindi</option>
+                    <option value="mr">Marathi</option>
+                </select>
+                <button class="btn btn-sm btn-brand" id="refreshBtn">Load</button>
+            </div>
+        </div>
+
+        <h2 class="h4 mb-3" id="todayTipTitle">Today's Tip</h2>
+        <p class="lead mb-4" id="tipText">Loading...</p>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-4"><div class="quiz-editor-card"><div class="text-muted" id="streakLabel">Streak</div><div class="h4 mb-0" id="streakCount">0 days</div></div></div>
+            <div class="col-md-4"><div class="quiz-editor-card"><div class="text-muted" id="rewardTodayLabel">Reward Today</div><div class="h4 mb-0" id="rewardToday">0</div></div></div>
+            <div class="col-md-4"><div class="quiz-editor-card"><div class="text-muted" id="totalPointsLabel">Total Points</div><div class="h4 mb-0" id="rewardTotal">0</div></div></div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2">
+            <a id="shareX" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener">Share on X</a>
+            <button class="btn btn-outline-secondary btn-sm" id="copyBtn">Copy Text</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const I18N = {
+    en: { pageTitle: "Daily Learning", back: "Back", load: "Load", todayTip: "Today's Tip", type: "Type", subject: "Subject", difficulty: "Difficulty", streak: "Streak", days: "days", rewardToday: "Reward Today", totalPoints: "Total Points", shareX: "Share on X", copyText: "Copy Text", loading: "Loading...", noTip: "No tip available.", subtitle: "Build streaks and earn reward points with one daily tip." },
+    hi: { pageTitle: "डेली लर्निंग", back: "वापस", load: "लोड", todayTip: "आज की टिप", type: "प्रकार", subject: "विषय", difficulty: "कठिनाई", streak: "स्ट्रिक", days: "दिन", rewardToday: "आज का रिवार्ड", totalPoints: "कुल पॉइंट्स", shareX: "X पर शेयर करें", copyText: "टेक्स्ट कॉपी करें", loading: "लोड हो रहा है...", noTip: "कोई टिप उपलब्ध नहीं है।", subtitle: "रोज एक टिप पढ़ें, स्ट्रिक बनाएं और पॉइंट्स पाएं।" },
+    mr: { pageTitle: "डेली लर्निंग", back: "मागे", load: "लोड", todayTip: "आजची टिप", type: "प्रकार", subject: "विषय", difficulty: "अवघडपणा", streak: "स्ट्रिक", days: "दिवस", rewardToday: "आजचे बक्षीस गुण", totalPoints: "एकूण गुण", shareX: "X वर शेअर करा", copyText: "मजकूर कॉपी करा", loading: "लोड होत आहे...", noTip: "सध्या कोणतीही टिप उपलब्ध नाही.", subtitle: "दररोज एक टिप वाचा, स्ट्रिक वाढवा आणि गुण मिळवा." }
+};
+
+function t(lang) { return I18N[lang] || I18N.en; }
+
+function applyStaticLabels(lang) {
+    const text = t(lang);
+    document.getElementById("pageTitle").textContent = text.pageTitle;
+    document.getElementById("pageTitleNav").textContent = text.pageTitle;
+    document.getElementById("todayTipSubtitle").textContent = text.subtitle;
+    document.getElementById("backBtnText").textContent = text.back;
+    document.getElementById("refreshBtn").textContent = text.load;
+    document.getElementById("todayTipTitle").textContent = text.todayTip;
+    document.getElementById("streakLabel").textContent = text.streak;
+    document.getElementById("rewardTodayLabel").textContent = text.rewardToday;
+    document.getElementById("totalPointsLabel").textContent = text.totalPoints;
+    document.getElementById("shareX").textContent = text.shareX;
+    document.getElementById("copyBtn").textContent = text.copyText;
+}
+
+async function loadTip() {
+    const lang = document.getElementById("langSelect").value;
+    const text = t(lang);
+    applyStaticLabels(lang);
+    document.getElementById("tipText").textContent = text.loading;
+
+    const res = await fetch(`/api/daily_tip?lang=${encodeURIComponent(lang)}`);
+    const data = await res.json();
+
+    if (!data.ok) { document.getElementById("tipText").textContent = text.noTip; return; }
+
+    document.getElementById("tipText").textContent = data.tip.text;
+    document.getElementById("tipType").textContent = `${text.type}: ${data.tip.type}`;
+    document.getElementById("tipSubject").textContent = `${text.subject}: ${data.tip.subject}`;
+    document.getElementById("tipDifficulty").textContent = `${text.difficulty}: ${data.tip.difficulty}`;
+    document.getElementById("streakCount").textContent = `${data.gamification.streak} ${text.days}`;
+    document.getElementById("rewardToday").textContent = `${data.gamification.reward_today}`;
+    document.getElementById("rewardTotal").textContent = `${data.gamification.total_reward_points}`;
+    document.getElementById("shareX").href = data.share.twitter_intent_url;
+    document.getElementById("copyBtn").onclick = async () => { await navigator.clipboard.writeText(data.share.text); };
+}
+
+document.getElementById("refreshBtn").addEventListener("click", loadTip);
+document.getElementById("langSelect").addEventListener("change", loadTip);
+applyStaticLabels(document.getElementById("langSelect").value);
+loadTip();
+</script>
+</body>
+</html>

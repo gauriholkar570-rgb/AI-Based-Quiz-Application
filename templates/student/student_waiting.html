@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Waiting Room - Student</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui-system.css') }}" rel="stylesheet">
+<style>
+.pin-chip { font-size: 1rem; }
+.spinner-wrap { width: 64px; height: 64px; }
+</style>
+</head>
+<body class="app-bg theme-{{ session.get('theme_mode', 'light') }} font-{{ session.get('font_scale', 'medium') }}">
+<nav class="navbar navbar-expand-lg topbar">
+    <div class="container-fluid">
+        <span class="navbar-brand">Quiz App</span>
+        <a href="{{ url_for('student_dashboard') }}" class="btn btn-outline-primary btn-sm">Back</a>
+    </div>
+</nav>
+
+<div class="page-wrap" style="max-width:760px;">
+    <div class="section-hero mb-3">
+        <h2>Joined Successfully</h2>
+        <p>Wait for teacher to start the live quiz.</p>
+    </div>
+
+    <div class="glass-card p-4 text-center">
+        <div class="chip pin-chip mb-2">PIN: {{ pin }}</div>
+        <h3 class="mb-2">{{ quiz_name }}</h3>
+        <p class="mb-1">Nickname: <strong>{{ player_name }}</strong></p>
+        <p class="text-muted mb-3">The first question will appear automatically.</p>
+        <div class="spinner-border text-primary spinner-wrap mb-4" role="status"></div>
+        <form action="{{ url_for('leave_quiz') }}" method="POST">
+            <button type="submit" class="btn btn-outline-danger w-100">Leave Quiz</button>
+        </form>
+    </div>
+</div>
+
+<script>
+const sessionId = "{{ session_id }}";
+setInterval(() => {
+    fetch(`/check_quiz_started/${sessionId}`)
+    .then(res => res.json())
+    .then(data => {
+        if (data.started) {
+            const p = encodeURIComponent("{{ player_name }}");
+            window.location.href = `/student_live_quiz/${sessionId}?player=${p}`;
+        }
+    });
+}, 2000);
+</script>
+</body>
+</html>

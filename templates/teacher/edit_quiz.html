@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Edit Quiz</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+:root{
+    --bg:#f6f8ff;
+    --card:#ffffff;
+    --primary:#4f46e5;
+}
+[data-theme="colorful"]{
+    --bg:#fff7ed;
+    --card:#ffffff;
+    --primary:#ec4899;
+}
+
+body{
+    background:var(--bg);
+    font-family:'Poppins',sans-serif;
+    transition:.3s;
+}
+
+.header{
+    text-align:center;
+    font-size:26px;
+    font-weight:800;
+    color:var(--primary);
+    margin-bottom:15px;
+}
+
+.quiz-card{
+    background:var(--card);
+    border-radius:22px;
+    padding:20px;
+    box-shadow:0 10px 25px rgba(0,0,0,0.08);
+    margin-bottom:25px;
+    transition:.25s;
+}
+.quiz-card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 14px 35px rgba(0,0,0,0.12);
+}
+
+.question-input{
+    font-size:18px;
+    font-weight:600;
+    border-radius:14px;
+}
+
+.option{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:14px;
+    border-radius:16px;
+    margin-bottom:10px;
+    transition:.2s;
+}
+.option:hover{
+    transform:scale(1.02);
+}
+
+.option input[type=text]{
+    border:none;
+    background:transparent;
+    outline:none;
+    flex:1;
+    font-weight:600;
+}
+
+.optA{background:#ffe4e6;}
+.optB{background:#e0f2fe;}
+.optC{background:#dcfce7;}
+.optD{background:#fef9c3;}
+
+.option input[type=radio]{transform:scale(1.4);}
+
+.option.correct{
+    outline:3px solid #22c55e;
+    background:#bbf7d0 !important;
+}
+
+.delete-btn{
+    background:#ff6b6b;
+    color:white;
+    border-radius:50px;
+    font-weight:600;
+}
+
+.add-btn{
+    background:#22c55e;
+    color:white;
+    border-radius:50px;
+    font-size:18px;
+    font-weight:700;
+}
+
+.save-btn{
+    background:var(--primary);
+    color:white;
+    border-radius:50px;
+    font-size:20px;
+    font-weight:800;
+}
+
+.theme-btn{
+    border-radius:50px;
+    font-weight:600;
+}
+.question-preview{
+    max-width:220px;
+    width:100%;
+    border-radius:12px;
+    border:1px solid #e5e7eb;
+    margin-bottom:10px;
+}
+
+/* 📱 Mobile spacing */
+@media(max-width:576px){
+    .quiz-card{padding:16px;}
+    .question-input{font-size:16px;}
+}
+</style>
+
+<script>
+function highlight(rad){
+    let box = rad.closest('.quiz-card');
+    box.querySelectorAll('.option').forEach(o=>o.classList.remove('correct'));
+    rad.closest('.option').classList.add('correct');
+}
+
+function addQuestion(){
+    let c=document.getElementById("questions");
+    let i=document.querySelectorAll(".quiz-card").length;
+
+    c.insertAdjacentHTML("beforeend",`
+    <div class="quiz-card">
+        <input type="hidden" name="new_question[]" value="1">
+
+        <input class="form-control question-input mb-3"
+        name="question_text[]" placeholder="Enter your question" required>
+        <input type="file" name="new_question_image[]" class="form-control mb-3" accept="image/*">
+
+        <div class="option optA">
+            <input type="radio" name="correct_${i}" value="A" onclick="highlight(this)">
+            <input type="text" name="option1[]" placeholder="Option A" required>
+        </div>
+
+        <div class="option optB">
+            <input type="radio" name="correct_${i}" value="B" onclick="highlight(this)">
+            <input type="text" name="option2[]" placeholder="Option B" required>
+        </div>
+
+        <div class="option optC">
+            <input type="radio" name="correct_${i}" value="C" onclick="highlight(this)">
+            <input type="text" name="option3[]" placeholder="Option C" required>
+        </div>
+
+        <div class="option optD">
+            <input type="radio" name="correct_${i}" value="D" onclick="highlight(this)">
+            <input type="text" name="option4[]" placeholder="Option D" required>
+        </div>
+
+        <button type="button" class="btn delete-btn w-100 mt-3"
+        onclick="this.parentElement.remove()">🗑 Remove Question</button>
+    </div>`);
+}
+
+function toggleTheme(){
+    let b=document.body;
+    b.dataset.theme = b.dataset.theme==="colorful"?"":"colorful";
+}
+</script>
+</head>
+
+<body data-theme="">
+
+<div class="container py-4">
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="header">✏️ Edit Quiz : {{ quiz['quiz_name'] }}</div>
+    <button type="button" onclick="toggleTheme()" class="btn btn-outline-primary theme-btn">
+        🎨 Theme
+    </button>
+</div>
+
+<form method="POST" action="/update_quiz/{{ quiz['quiz_id'] }}" enctype="multipart/form-data">
+
+<div id="questions">
+
+{% for item in questions %}
+<div class="quiz-card">
+
+<input type="hidden" name="question_id[]" value="{{ item.question['question_id'] }}">
+
+<input class="form-control question-input mb-3"
+name="question_text[]"
+value="{{ item.question['question_text'] }}" required>
+{% if item.question['media_url'] %}
+<img src="{{ url_for('static', filename=item.question['media_url']) }}" alt="Question image" class="question-preview">
+{% endif %}
+<input type="file" name="question_image_existing[]" class="form-control mb-3" accept="image/*">
+
+{% for opt in item.options %}
+<div class="option
+{% if loop.index==1 %}optA{% elif loop.index==2 %}optB
+{% elif loop.index==3 %}optC{% else %}optD{% endif %}
+{% if opt['is_correct']==1 %}correct{% endif %}">
+
+<input type="hidden" name="option_id[]" value="{{ opt['option_id'] }}">
+
+<input type="radio"
+name="correct_{{ item.question['question_id'] }}"
+value="{{ opt['option_id'] }}"
+onclick="highlight(this)"
+{% if opt['is_correct']==1 %}checked{% endif %}>
+
+<input type="text"
+name="option_text[]"
+value="{{ opt['option_text'] }}" required>
+</div>
+{% endfor %}
+
+<a href="/delete_question/{{ item.question['question_id'] }}/{{ quiz['quiz_id'] }}"
+class="btn delete-btn w-100 mt-3"
+onclick="return confirm('Delete this question?')">
+❌ Delete Question
+</a>
+
+</div>
+{% endfor %}
+</div>
+
+<button type="button" onclick="addQuestion()" class="btn add-btn w-100 mb-3">
+➕ Add Question
+</button>
+
+<button type="submit" class="btn save-btn w-100">
+💾 Save Changes
+</button>
+
+</form>
+
+</div>
+</body>
+</html>

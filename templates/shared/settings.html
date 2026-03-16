@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Quiz App</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/ui-system.css') }}" rel="stylesheet">
+</head>
+<body class="app-bg theme-{{ session.get('theme_mode', 'light') }} font-{{ session.get('font_scale', 'medium') }}">
+    {% set lang = session.get('app_language', 'en') %}
+    <nav class="navbar navbar-expand-lg topbar">
+        <div class="container-fluid">
+            <span class="navbar-brand">Quiz App</span>
+            <div class="d-flex align-items-center gap-2">
+                <span class="hello me-2">{{ 'Hello' if lang == 'en' else 'नमस्कार' }}, {{ session['username'] }}</span>
+                <a href="/logout" class="btn btn-outline-danger btn-sm">{{ 'Logout' if lang == 'en' else 'लॉगआउट' }}</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="page-wrap">
+        <h1 class="page-title">{{ 'Settings' if lang == 'en' else 'सेटिंग्ज' }}</h1>
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="mb-3">
+            {% for message in messages %}
+            <div class="alert alert-info mb-2">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <div class="row g-4">
+            <div class="col-12">
+                <div class="glass-card p-4">
+                    <h2 class="h5 mb-3">{{ 'Profile' if lang == 'en' else 'प्रोफाइल' }}</h2>
+                    <form method="POST" action="{{ url_for('update_profile') }}" class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ 'Username' if lang == 'en' else 'यूजरनेम' }}</label>
+                            <input type="text" name="username" class="form-control" value="{{ user['username'] }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ 'Email' if lang == 'en' else 'ईमेल' }}</label>
+                            <input type="email" name="email" class="form-control" value="{{ user['email'] }}" required>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-brand">{{ 'Save Profile' if lang == 'en' else 'प्रोफाइल सेव्ह करा' }}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <div class="glass-card p-4">
+                    <h2 class="h5 mb-3">{{ 'Update Password' if lang == 'en' else 'पासवर्ड अपडेट करा' }}</h2>
+                    <form method="POST" action="{{ url_for('update_password') }}" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">{{ 'Current Password' if lang == 'en' else 'सध्याचा पासवर्ड' }}</label>
+                            <input type="password" name="current_password" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">{{ 'New Password' if lang == 'en' else 'नवीन पासवर्ड' }}</label>
+                            <input type="password" name="new_password" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">{{ 'Confirm Password' if lang == 'en' else 'पासवर्ड खात्री' }}</label>
+                            <input type="password" name="confirm_password" class="form-control" required>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-brand">{{ 'Update Password' if lang == 'en' else 'पासवर्ड अपडेट करा' }}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="glass-card p-4 h-100">
+                    <h2 class="h5 mb-3">{{ 'Appearance + Language' if lang == 'en' else 'दिसणे + भाषा' }}</h2>
+                    <form method="POST" action="{{ url_for('update_appearance') }}" class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">{{ 'Theme Mode' if lang == 'en' else 'थीम मोड' }}</label>
+                            <select name="theme_mode" class="form-select">
+                                <option value="light" {% if user['theme_mode'] == 'light' %}selected{% endif %}>{{ 'Light' if lang == 'en' else 'लाईट' }}</option>
+                                <option value="dark" {% if user['theme_mode'] == 'dark' %}selected{% endif %}>{{ 'Dark' if lang == 'en' else 'डार्क' }}</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Font Size</label>
+                            <select name="font_scale" class="form-select">
+                                <option value="small" {% if user['font_scale'] == 'small' %}selected{% endif %}>{{ 'Small' if lang == 'en' else 'लहान' }}</option>
+                                <option value="medium" {% if user['font_scale'] == 'medium' %}selected{% endif %}>{{ 'Medium' if lang == 'en' else 'मध्यम' }}</option>
+                                <option value="large" {% if user['font_scale'] == 'large' %}selected{% endif %}>{{ 'Large' if lang == 'en' else 'मोठा' }}</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">{{ 'App Language' if lang == 'en' else 'अ‍ॅप भाषा' }}</label>
+                            <select name="app_language" class="form-select">
+                                <option value="en" {% if user['app_language'] == 'en' %}selected{% endif %}>English</option>
+                                <option value="mr" {% if user['app_language'] == 'mr' %}selected{% endif %}>Marathi</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-brand">{{ 'Save Appearance' if lang == 'en' else 'सेव्ह करा' }}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="glass-card p-4 h-100">
+                    <h2 class="h5 mb-3">{{ 'Notifications' if lang == 'en' else 'सूचना' }}</h2>
+                    <form method="POST" action="{{ url_for('update_notifications') }}">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="email_alerts" id="email_alerts" {% if user['email_alerts'] == 1 %}checked{% endif %}>
+                            <label class="form-check-label" for="email_alerts">{{ 'Enable Email Alerts' if lang == 'en' else 'ईमेल अलर्ट सुरू करा' }}</label>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="mute_notifications" id="mute_notifications" {% if user['mute_notifications'] == 1 %}checked{% endif %}>
+                            <label class="form-check-label" for="mute_notifications">{{ 'Mute Notifications' if lang == 'en' else 'सूचना म्यूट करा' }}</label>
+                        </div>
+                        <button type="submit" class="btn btn-brand">{{ 'Save Notifications' if lang == 'en' else 'सूचना सेव्ह करा' }}</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <div class="glass-card p-4">
+                    <h2 class="h5 mb-3">{{ 'Privacy' if lang == 'en' else 'गोपनीयता' }}</h2>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <form method="POST" action="{{ url_for('logout_all_devices') }}">
+                            <button type="submit" class="btn btn-outline-warning">{{ 'Logout from all devices' if lang == 'en' else 'सर्व डिव्हाइसवरून लॉगआउट' }}</button>
+                        </form>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('delete_account') }}" class="row g-2 align-items-end" onsubmit="return confirm('Delete account permanently?');">
+                        <div class="col-md-6">
+                            <label class="form-label text-danger">{{ 'Delete Account (enter current password)' if lang == 'en' else 'अकाउंट डिलीट (सध्याचा पासवर्ड टाका)' }}</label>
+                            <input type="password" name="current_password" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <button type="submit" class="btn btn-outline-danger">{{ 'Delete Account' if lang == 'en' else 'अकाउंट डिलीट करा' }}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <div class="d-flex gap-2">
+                    {% if session.get('role') == 'Teacher' %}
+                    <a href="/teacher_dashboard" class="btn btn-outline-primary">{{ 'Back to Dashboard' if lang == 'en' else 'डॅशबोर्डवर जा' }}</a>
+                    {% else %}
+                    <a href="/student_dashboard" class="btn btn-outline-primary">{{ 'Back to Dashboard' if lang == 'en' else 'डॅशबोर्डवर जा' }}</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
