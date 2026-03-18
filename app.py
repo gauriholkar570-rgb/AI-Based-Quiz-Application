@@ -5401,11 +5401,21 @@ def api_daily_tip():
 @app.route('/join_quiz', methods=['GET', 'POST'])
 def join_quiz():
     if request.method == 'POST':
-        pin = request.form.get('pin')
+        pin_raw = (request.form.get('pin') or '').strip()
         nickname = (request.form.get('nickname') or '').strip()
 
-        if not pin or not nickname:
+        if not pin_raw or not nickname:
             flash("PIN and Nickname are required")
+            return redirect('/join_quiz')
+
+        if not pin_raw.isdigit():
+            flash("PIN must be numbers only")
+            return redirect('/join_quiz')
+
+        try:
+            pin = int(pin_raw)
+        except ValueError:
+            flash("Invalid PIN format")
             return redirect('/join_quiz')
 
         conn = get_db_connection()
@@ -5807,9 +5817,10 @@ def submit_answer():
             "next_player": rank_details["next_player"]
         })
 
+    normalized_answer = (answer or "").strip()
     option_row = conn.execute(
-        "SELECT is_correct FROM options WHERE question_id=? AND option_text=?",
-        (question_id, answer)
+        "SELECT MAX(is_correct) AS is_correct FROM options WHERE question_id=? AND TRIM(option_text)=?",
+        (question_id, normalized_answer)
     ).fetchone()
     raw_correct = 1 if option_row and option_row["is_correct"] == 1 else 0
     in_time = response_ms <= (time_limit * 1000)
