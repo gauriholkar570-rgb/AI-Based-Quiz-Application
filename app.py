@@ -359,7 +359,7 @@ def _get_live_question_state(conn, session_data):
         return {"finished": True, "started": True}
 
     options = conn.execute(
-        "SELECT option_text, is_correct FROM options WHERE question_id=? ORDER BY option_id",
+        "SELECT option_id, option_text, is_correct FROM options WHERE question_id=? ORDER BY option_id",
         (question["question_id"],)
     ).fetchall()
 
@@ -387,7 +387,7 @@ def _get_live_question_state(conn, session_data):
         "time_limit": time_limit,
         "time_left": time_left,
         "phase": "question" if time_left > 0 else "reveal",
-        "options": [opt["option_text"] for opt in options],
+        "options": [{"id": opt["option_id"], "text": opt["option_text"]} for opt in options],
         "correct_option": correct_option,
     }
 
@@ -5757,6 +5757,7 @@ def submit_answer():
     session_id = data.get('session_id')
     player_name = (data.get('player_name') or '').strip() or session.get('student_nickname')
     answer = data.get('answer')
+    option_id = data.get('option_id')
 
     if not session_id or not player_name or answer is None:
         return jsonify({"success": False, "message": "Invalid submission"}), 400
@@ -5818,11 +5819,19 @@ def submit_answer():
         })
 
     normalized_answer = (answer or "").strip()
-    option_row = conn.execute(
-        "SELECT MAX(is_correct) AS is_correct FROM options WHERE question_id=? AND TRIM(option_text)=?",
-        (question_id, normalized_answer)
-    ).fetchone()
-    raw_correct = 1 if option_row and option_row["is_correct"] == 1 else 0
+    raw_correct = 0
+    if option_id:
+        option_row = conn.execute(
+            "SELECT is_correct FROM options WHERE question_id=? AND option_id=?",
+            (question_id, option_id)
+        ).fetchone()
+        raw_correct = 1 if option_row and option_row["is_correct"] == 1 else 0
+    else:
+        option_row = conn.execute(
+            "SELECT MAX(is_correct) AS is_correct FROM options WHERE question_id=? AND TRIM(option_text)=?",
+            (question_id, normalized_answer)
+        ).fetchone()
+        raw_correct = 1 if option_row and option_row["is_correct"] == 1 else 0
     in_time = response_ms <= (time_limit * 1000)
     is_correct = 1 if (raw_correct and in_time) else 0
 

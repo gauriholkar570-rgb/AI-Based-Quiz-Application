@@ -258,9 +258,13 @@ function renderQuestion(data) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `opt ${optionClasses[index % optionClasses.length]}`;
-    btn.innerText = opt;
-    btn.dataset.option = opt;
-    btn.addEventListener("click", () => submitAnswer(opt, btn));
+    const optText = (opt && typeof opt === "object") ? opt.text : opt;
+    btn.innerText = optText;
+    if (opt && typeof opt === "object") {
+      btn.dataset.optionId = opt.id;
+    }
+    btn.dataset.option = optText;
+    btn.addEventListener("click", () => submitAnswer(optText, btn));
     optionsBox.appendChild(btn);
   });
 
@@ -355,7 +359,8 @@ function submitAnswer(rawChoice, btn) {
     body: JSON.stringify({
       session_id: sessionId,
       player_name: playerName,
-      answer: rawChoice
+      answer: rawChoice,
+      option_id: btn && btn.dataset ? (btn.dataset.optionId || null) : null
     })
   })
   .then(r => r.json())
