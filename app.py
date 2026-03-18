@@ -5817,7 +5817,7 @@ def submit_answer():
 
     if is_correct:
         remaining_ms = max(0, (time_limit * 1000) - response_ms)
-        score = int(200 + (800 * (remaining_ms / max(1, time_limit * 1000))))
+        score = int(round(1000 * (remaining_ms / max(1, time_limit * 1000))))
     else:
         score = 0
 
