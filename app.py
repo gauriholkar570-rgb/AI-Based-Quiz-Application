@@ -116,11 +116,16 @@ class DBConnection:
 
     def execute(self, sql, params=None):
         if not self.is_postgres:
-            return self.conn.execute(sql, params or ())
+            if params is None:
+                return self.conn.execute(sql)
+            return self.conn.execute(sql, params)
         q = self._translate_sql(sql)
         q = self._convert_params(q)
         cur = self.conn.cursor()
-        cur.execute(q, params or ())
+        if params is None:
+            cur.execute(q)
+        else:
+            cur.execute(q, params)
         return cur
 
     def executemany(self, sql, seq_of_params):
