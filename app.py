@@ -17,6 +17,7 @@ import urllib.parse
 import urllib.request
 import urllib.error
 import csv
+import base64
 from io import StringIO, BytesIO
 from xml.sax.saxutils import escape as xml_escape
 
@@ -28,6 +29,10 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
 database_url = os.environ.get('DATABASE_URL')
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
+USE_POSTGRES = bool(database_url)
+if USE_POSTGRES:
+    import psycopg2                             
+    import psycopg2.extras
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///quiz.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -36,6 +41,8 @@ db = SQLAlchemy(app)
 
 ALLOWED_QUESTION_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 QUESTION_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "static", "uploads", "questions")
+ALLOWED_AVATAR_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
+AVATAR_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "static", "uploads", "avatars")
 
 # ---------------- DB CONNECTION ----------------
 # Use a single canonical DB file across app and utility scripts.
@@ -50,26 +57,35 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip() or "PASTE_YOUR_OPE
 class DBConnection:
     def __init__(self, db_path):
         self.db_path = db_path
-        self.conn = sqlite3.connect(self.db_path, timeout=10.0, check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
-        # Give SQLite a chance to wait when DB is locked
-        try:
-            self.conn.execute("PRAGMA busy_timeout = 5000")
-        except Exception:
-            pass
-        # Try to enable WAL mode for better concurrent access, but continue if DB is locked
-        try:
-            self.conn.execute("PRAGMA journal_mode=WAL")
-        except sqlite3.OperationalError as e:
-            print(f"Warning: could not set WAL mode: {e}")
-        # Ensure foreign key enforcement
-        try:
-            self.conn.execute("PRAGMA foreign_keys = ON")
-        except Exception:
-            pass
+        self.is_postgres = USE_POSTGRES
+        if self.is_postgres:
+            self.conn = psycopg2.connect(
+                database_url,
+                connect_timeout=10,
+                cursor_factory=psycopg2.extras.RealDictCursor
+            )
+        else:
+            self.conn = sqlite3.connect(self.db_path, timeout=10.0, check_same_thread=False)
+            self.conn.row_factory = sqlite3.Row
+            # Give SQLite a chance to wait when DB is locked
+            try:
+                self.conn.execute("PRAGMA busy_timeout = 5000")
+            except Exception:
+                pass
+            # Try to enable WAL mode for better concurrent access, but continue if DB is locked
+            try:
+                self.conn.execute("PRAGMA journal_mode=WAL")
+            except sqlite3.OperationalError as e:
+                print(f"Warning: could not set WAL mode: {e}")
+            # Ensure foreign key enforcement
+            try:
+                self.conn.execute("PRAGMA foreign_keys = ON")
+            except Exception:
+                pass
     
     def __enter__(self):
-        return self.conn
+        # Return wrapper so callers can access is_postgres and helpers
+        return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
@@ -77,6 +93,44 @@ class DBConnection:
         else:
             self.conn.rollback()
         self.conn.close()
+
+    def _translate_sql(self, sql):
+        if not self.is_postgres:
+            return sql
+        s = sql
+        s = re.sub(r"\\bDATETIME\\b", "TIMESTAMP", s, flags=re.IGNORECASE)
+        s = re.sub(r"\\bINTEGER\\s+PRIMARY\\s+KEY\\s+AUTOINCREMENT\\b", "SERIAL PRIMARY KEY", s, flags=re.IGNORECASE)
+        s = re.sub(r"datetime\\('now'\\)", "CURRENT_TIMESTAMP", s, flags=re.IGNORECASE)
+        s = re.sub(r"date\\('now'\\)", "CURRENT_DATE", s, flags=re.IGNORECASE)
+        if re.match(r"\\s*INSERT\\s+OR\\s+IGNORE\\b", s, flags=re.IGNORECASE):
+            s = re.sub(r"\\bINSERT\\s+OR\\s+IGNORE\\b", "INSERT", s, flags=re.IGNORECASE)
+            if "ON CONFLICT" not in s.upper():
+                s = s.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
+        return s
+
+    def _convert_params(self, sql):
+        if not self.is_postgres:
+            return sql
+        # Convert qmark placeholders to psycopg2 style.
+        return re.sub(r"\\?", "%s", sql)
+
+    def execute(self, sql, params=None):
+        if not self.is_postgres:
+            return self.conn.execute(sql, params or ())
+        q = self._translate_sql(sql)
+        q = self._convert_params(q)
+        cur = self.conn.cursor()
+        cur.execute(q, params or ())
+        return cur
+
+    def executemany(self, sql, seq_of_params):
+        if not self.is_postgres:
+            return self.conn.executemany(sql, seq_of_params)
+        q = self._translate_sql(sql)
+        q = self._convert_params(q)
+        cur = self.conn.cursor()
+        cur.executemany(q, seq_of_params)
+        return cur
     
     # Allow direct access to connection methods for non-with usage
     def __getattr__(self, name):
@@ -84,6 +138,15 @@ class DBConnection:
 
 def get_db_connection():
     return DBConnection(DATABASE)
+
+def _insert_and_get_id(conn, sql, params, id_col):
+    if conn.is_postgres:
+        stmt = sql.rstrip().rstrip(";") + f" RETURNING {id_col}"
+        cur = conn.execute(stmt, params)
+        row = cur.fetchone()
+        return row[id_col] if row else None
+    cur = conn.execute(sql, params)
+    return cur.lastrowid
 
 def _parse_db_datetime(value):
     if not value:
@@ -108,6 +171,60 @@ def _save_question_image(upload):
     save_path = os.path.join(QUESTION_UPLOAD_DIR, filename)
     upload.save(save_path)
     return f"uploads/questions/{filename}"
+
+def _ensure_avatar_dir():
+    os.makedirs(AVATAR_UPLOAD_DIR, exist_ok=True)
+
+def _avatar_url_from_profile_pic(profile_pic):
+    default_avatar = url_for('static', filename='avatars/default.png')
+    if not profile_pic:
+        return default_avatar
+    if profile_pic.startswith("http://") or profile_pic.startswith("https://"):
+        return profile_pic
+    if profile_pic.startswith("data:"):
+        return profile_pic
+    return url_for('static', filename=profile_pic)
+
+def _save_avatar_upload(upload):
+    if not upload or not getattr(upload, "filename", ""):
+        return None
+    ext = os.path.splitext(upload.filename)[1].lower()
+    if ext not in ALLOWED_AVATAR_EXTS:
+        raise ValueError("Unsupported avatar file type.")
+    _ensure_avatar_dir()
+    base = secure_filename(os.path.splitext(upload.filename)[0]) or "avatar"
+    filename = f"{base}-{uuid.uuid4().hex}{ext}"
+    save_path = os.path.join(AVATAR_UPLOAD_DIR, filename)
+    upload.save(save_path)
+    return f"uploads/avatars/{filename}"
+
+def _save_avatar_svg(svg_text):
+    if not svg_text or "<svg" not in svg_text.lower():
+        raise ValueError("Invalid SVG data.")
+    _ensure_avatar_dir()
+    filename = f"avatar-{uuid.uuid4().hex}.svg"
+    save_path = os.path.join(AVATAR_UPLOAD_DIR, filename)
+    with open(save_path, "w", encoding="utf-8") as f:
+        f.write(svg_text)
+    return f"uploads/avatars/{filename}"
+
+def _save_avatar_data_url(data_url):
+    if not data_url or not data_url.startswith("data:image/"):
+        raise ValueError("Invalid image data.")
+    header, b64 = data_url.split(",", 1)
+    ext = "png"
+    if "image/jpeg" in header:
+        ext = "jpg"
+    elif "image/webp" in header:
+        ext = "webp"
+    elif "image/gif" in header:
+        ext = "gif"
+    _ensure_avatar_dir()
+    filename = f"avatar-{uuid.uuid4().hex}.{ext}"
+    save_path = os.path.join(AVATAR_UPLOAD_DIR, filename)
+    with open(save_path, "wb") as f:
+        f.write(base64.b64decode(b64))
+    return f"uploads/avatars/{filename}"
 
 def _csv_response(filename, headers, rows):
     output = StringIO()
@@ -441,6 +558,39 @@ def _get_live_leaderboard_rows(conn, session_id, limit=None):
 
     return [dict(row) for row in scores]
 
+def _get_live_avatar_map(conn, session_id):
+    default_avatar = url_for('static', filename='avatars/default.png')
+    participant_rows = conn.execute(
+        "SELECT nickname, user_id FROM participants WHERE session_id=?",
+        (session_id,)
+    ).fetchall()
+    name_to_user = { (r["nickname"] or "").strip().lower(): r["user_id"] for r in participant_rows }
+    avatar_cache = {}
+
+    def resolve(player_name):
+        key = (player_name or "").strip().lower()
+        if not key:
+            return default_avatar
+        if key in avatar_cache:
+            return avatar_cache[key]
+        user_id = name_to_user.get(key)
+        row = None
+        if user_id:
+            row = conn.execute(
+                "SELECT profile_pic FROM Users WHERE user_id=? LIMIT 1",
+                (user_id,)
+            ).fetchone()
+        if not row:
+            row = conn.execute(
+                "SELECT profile_pic FROM Users WHERE lower(username)=lower(?) LIMIT 1",
+                (player_name,)
+            ).fetchone()
+        avatar_url = _avatar_url_from_profile_pic(row["profile_pic"] if row else None)
+        avatar_cache[key] = avatar_url
+        return avatar_url
+
+    return resolve
+
 def _get_player_live_rank_details(conn, session_id, player_name):
     rows = _get_live_leaderboard_rows(conn, session_id)
     total_players = len(rows)
@@ -560,6 +710,8 @@ def _get_player_question_answer(conn, session_id, question_id, player_name):
 
 
 def ensure_legacy_practice_quiz_row(conn, quiz_id, quiz_name, description):
+    if conn.is_postgres:
+        return
     """Keep legacy PracticeQuizzes row in sync when old FK still points to it."""
     try:
         table_exists = conn.execute(
@@ -585,6 +737,8 @@ def ensure_legacy_practice_quiz_row(conn, quiz_id, quiz_name, description):
 def migrate_practice_tables():
     """Migrate existing Practice_Quizzes table to include new columns"""
     with get_db_connection() as conn:
+        if conn.is_postgres:
+            return
         try:
             # Check if Practice_Quizzes table exists
             cursor = conn.execute(
@@ -912,6 +1066,8 @@ CREATE TABLE IF NOT EXISTS Options(
     current_question INTEGER DEFAULT 0,
     started INTEGER DEFAULT 0,
     question_started_at DATETIME DEFAULT NULL,
+    final_released INTEGER DEFAULT 0,
+    scoreboard_released INTEGER DEFAULT 0,
     FOREIGN KEY (quiz_id) REFERENCES Quizzes(quiz_id),
     FOREIGN KEY (created_by) REFERENCES Users(user_id)
 )
@@ -923,8 +1079,10 @@ CREATE TABLE IF NOT EXISTS Options(
             participant_id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id INTEGER NOT NULL,
             nickname TEXT NOT NULL,
+            user_id INTEGER,
             joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (session_id) REFERENCES live_sessions(session_id)
+            FOREIGN KEY (session_id) REFERENCES live_sessions(session_id),
+            FOREIGN KEY (user_id) REFERENCES Users(user_id)
         )""")
 
         conn.execute("""
@@ -1099,72 +1257,83 @@ CREATE TABLE IF NOT EXISTS Options(
             CREATE UNIQUE INDEX IF NOT EXISTS idx_practice_first_attempt_unique
             ON PracticeFirstAttempts(user_id, quiz_id)
         """)
-        live_session_columns = [row[1] for row in conn.execute("PRAGMA table_info(live_sessions)").fetchall()]
-        if 'started' not in live_session_columns:
-            conn.execute("ALTER TABLE live_sessions ADD COLUMN started INTEGER DEFAULT 0")
-        if 'question_started_at' not in live_session_columns:
-            conn.execute("ALTER TABLE live_sessions ADD COLUMN question_started_at DATETIME DEFAULT NULL")
+        if not conn.is_postgres:
+            live_session_columns = [row[1] for row in conn.execute("PRAGMA table_info(live_sessions)").fetchall()]
+            if 'started' not in live_session_columns:
+                conn.execute("ALTER TABLE live_sessions ADD COLUMN started INTEGER DEFAULT 0")
+            if 'question_started_at' not in live_session_columns:
+                conn.execute("ALTER TABLE live_sessions ADD COLUMN question_started_at DATETIME DEFAULT NULL")
+            if 'final_released' not in live_session_columns:
+                conn.execute("ALTER TABLE live_sessions ADD COLUMN final_released INTEGER DEFAULT 0")
+            if 'scoreboard_released' not in live_session_columns:
+                conn.execute("ALTER TABLE live_sessions ADD COLUMN scoreboard_released INTEGER DEFAULT 0")
 
-        answer_columns = [row[1] for row in conn.execute("PRAGMA table_info(player_answers)").fetchall()]
-        if 'question_id' not in answer_columns:
-            conn.execute("ALTER TABLE player_answers ADD COLUMN question_id INTEGER")
-        if 'question_index' not in answer_columns:
-            conn.execute("ALTER TABLE player_answers ADD COLUMN question_index INTEGER DEFAULT 0")
-        if 'is_correct' not in answer_columns:
-            conn.execute("ALTER TABLE player_answers ADD COLUMN is_correct INTEGER DEFAULT 0")
-        if 'response_ms' not in answer_columns:
-            conn.execute("ALTER TABLE player_answers ADD COLUMN response_ms INTEGER DEFAULT 0")
-        if 'score_awarded' not in answer_columns:
-            conn.execute("ALTER TABLE player_answers ADD COLUMN score_awarded INTEGER DEFAULT 0")
-        question_columns = [row[1] for row in conn.execute("PRAGMA table_info(Questions)").fetchall()]
-        if 'media_url' not in question_columns:
-            conn.execute("ALTER TABLE Questions ADD COLUMN media_url TEXT")
-        # Backward-compatible schema updates
-        user_columns = [row[1] for row in conn.execute("PRAGMA table_info(Users)").fetchall()]
-        if 'department' not in user_columns:
-            conn.execute("ALTER TABLE Users ADD COLUMN department TEXT DEFAULT 'Computer'")
-            conn.execute("UPDATE Users SET department='Computer' WHERE department IS NULL OR department=''")
-        if 'theme_mode' not in user_columns:
-            conn.execute("ALTER TABLE Users ADD COLUMN theme_mode TEXT DEFAULT 'light'")
-        if 'font_scale' not in user_columns:
-            conn.execute("ALTER TABLE Users ADD COLUMN font_scale TEXT DEFAULT 'medium'")
-        if 'app_language' not in user_columns:
-            conn.execute("ALTER TABLE Users ADD COLUMN app_language TEXT DEFAULT 'en'")
-        if 'email_alerts' not in user_columns:
-            conn.execute("ALTER TABLE Users ADD COLUMN email_alerts INTEGER DEFAULT 1")
-        if 'mute_notifications' not in user_columns:
-            conn.execute("ALTER TABLE Users ADD COLUMN mute_notifications INTEGER DEFAULT 0")
-        if 'session_version' not in user_columns:
-            conn.execute("ALTER TABLE Users ADD COLUMN session_version INTEGER DEFAULT 0")
+            answer_columns = [row[1] for row in conn.execute("PRAGMA table_info(player_answers)").fetchall()]
+            if 'question_id' not in answer_columns:
+                conn.execute("ALTER TABLE player_answers ADD COLUMN question_id INTEGER")
+            if 'question_index' not in answer_columns:
+                conn.execute("ALTER TABLE player_answers ADD COLUMN question_index INTEGER DEFAULT 0")
+            if 'is_correct' not in answer_columns:
+                conn.execute("ALTER TABLE player_answers ADD COLUMN is_correct INTEGER DEFAULT 0")
+            if 'response_ms' not in answer_columns:
+                conn.execute("ALTER TABLE player_answers ADD COLUMN response_ms INTEGER DEFAULT 0")
+            if 'score_awarded' not in answer_columns:
+                conn.execute("ALTER TABLE player_answers ADD COLUMN score_awarded INTEGER DEFAULT 0")
+            question_columns = [row[1] for row in conn.execute("PRAGMA table_info(Questions)").fetchall()]
+            if 'media_url' not in question_columns:
+                conn.execute("ALTER TABLE Questions ADD COLUMN media_url TEXT")
+            # Backward-compatible schema updates
+            user_columns = [row[1] for row in conn.execute("PRAGMA table_info(Users)").fetchall()]
+            if 'department' not in user_columns:
+                conn.execute("ALTER TABLE Users ADD COLUMN department TEXT DEFAULT 'Computer'")
+                conn.execute("UPDATE Users SET department='Computer' WHERE department IS NULL OR department=''")
+            if 'profile_pic' not in user_columns:
+                conn.execute("ALTER TABLE Users ADD COLUMN profile_pic TEXT")
+            if 'theme_mode' not in user_columns:
+                conn.execute("ALTER TABLE Users ADD COLUMN theme_mode TEXT DEFAULT 'light'")
+            if 'font_scale' not in user_columns:
+                conn.execute("ALTER TABLE Users ADD COLUMN font_scale TEXT DEFAULT 'medium'")
+            if 'app_language' not in user_columns:
+                conn.execute("ALTER TABLE Users ADD COLUMN app_language TEXT DEFAULT 'en'")
+            if 'email_alerts' not in user_columns:
+                conn.execute("ALTER TABLE Users ADD COLUMN email_alerts INTEGER DEFAULT 1")
+            if 'mute_notifications' not in user_columns:
+                conn.execute("ALTER TABLE Users ADD COLUMN mute_notifications INTEGER DEFAULT 0")
+            if 'session_version' not in user_columns:
+                conn.execute("ALTER TABLE Users ADD COLUMN session_version INTEGER DEFAULT 0")
 
-        practice_table_exists = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='Practice_Quizzes'"
-        ).fetchone()
-        if practice_table_exists:
-            practice_quiz_columns = [row[1] for row in conn.execute("PRAGMA table_info(Practice_Quizzes)").fetchall()]
-            if 'department' not in practice_quiz_columns:
-                conn.execute("ALTER TABLE Practice_Quizzes ADD COLUMN department TEXT")
-            conn.execute("""
-                UPDATE Practice_Quizzes
-                SET department = (
-                    SELECT COALESCE(NULLIF(u.department, ''), 'Computer')
-                    FROM Users u
-                    WHERE u.user_id = Practice_Quizzes.created_by
-                )
-                WHERE department IS NULL OR department = ''
-            """)
+            practice_table_exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='Practice_Quizzes'"
+            ).fetchone()
+            if practice_table_exists:
+                practice_quiz_columns = [row[1] for row in conn.execute("PRAGMA table_info(Practice_Quizzes)").fetchall()]
+                if 'department' not in practice_quiz_columns:
+                    conn.execute("ALTER TABLE Practice_Quizzes ADD COLUMN department TEXT")
+                conn.execute("""
+                    UPDATE Practice_Quizzes
+                    SET department = (
+                        SELECT COALESCE(NULLIF(u.department, ''), 'Computer')
+                        FROM Users u
+                        WHERE u.user_id = Practice_Quizzes.created_by
+                    )
+                    WHERE department IS NULL OR department = ''
+                """)
 
-            if 'target_departments' not in practice_quiz_columns:
-                conn.execute("ALTER TABLE Practice_Quizzes ADD COLUMN target_departments TEXT")
-            conn.execute("""
-                UPDATE Practice_Quizzes
-                SET target_departments = COALESCE(NULLIF(department, ''), 'Computer')
-                WHERE target_departments IS NULL OR target_departments = ''
-            """)
+            participant_columns = [row[1] for row in conn.execute("PRAGMA table_info(participants)").fetchall()]
+            if 'user_id' not in participant_columns:
+                conn.execute("ALTER TABLE participants ADD COLUMN user_id INTEGER")
 
-        tip_view_columns = [row[1] for row in conn.execute("PRAGMA table_info(UserTipViews)").fetchall()]
-        if 'reward_points' not in tip_view_columns:
-            conn.execute("ALTER TABLE UserTipViews ADD COLUMN reward_points INTEGER DEFAULT 0")
+                if 'target_departments' not in practice_quiz_columns:
+                    conn.execute("ALTER TABLE Practice_Quizzes ADD COLUMN target_departments TEXT")
+                conn.execute("""
+                    UPDATE Practice_Quizzes
+                    SET target_departments = COALESCE(NULLIF(department, ''), 'Computer')
+                    WHERE target_departments IS NULL OR target_departments = ''
+                """)
+
+            tip_view_columns = [row[1] for row in conn.execute("PRAGMA table_info(UserTipViews)").fetchall()]
+            if 'reward_points' not in tip_view_columns:
+                conn.execute("ALTER TABLE UserTipViews ADD COLUMN reward_points INTEGER DEFAULT 0")
 
         # Prevent duplicate live joins and duplicate answer submissions.
         # Clean legacy duplicate rows first so unique indexes can be created safely.
@@ -1290,9 +1459,10 @@ def _determine_tip_subject(conn, user_id, role):
         return (row["subject"] if row else "general") or "general"
 
     # Older DBs may not have Practice_Quizzes.subject, so keep this backward-compatible.
-    practice_cols = {row[1] for row in conn.execute("PRAGMA table_info(Practice_Quizzes)").fetchall()}
-    if "subject" not in practice_cols:
-        return "general"
+    if not conn.is_postgres:
+        practice_cols = {row[1] for row in conn.execute("PRAGMA table_info(Practice_Quizzes)").fetchall()}
+        if "subject" not in practice_cols:
+            return "general"
 
     try:
         row = conn.execute("""
@@ -1464,11 +1634,12 @@ def _delete_user_account(conn, user_id):
         conn.execute("DELETE FROM PracticeProgress WHERE quiz_id=?", (quiz_id,))
         conn.execute("DELETE FROM Practice_Quizzes WHERE quiz_id=?", (quiz_id,))
 
-        legacy_exists = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='PracticeQuizzes'"
-        ).fetchone()
-        if legacy_exists:
-            conn.execute("DELETE FROM PracticeQuizzes WHERE quiz_id=?", (quiz_id,))
+        if not conn.is_postgres:
+            legacy_exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='PracticeQuizzes'"
+            ).fetchone()
+            if legacy_exists:
+                conn.execute("DELETE FROM PracticeQuizzes WHERE quiz_id=?", (quiz_id,))
 
     conn.execute("DELETE FROM PracticeAnswers WHERE user_id=?", (user_id,))
     conn.execute("DELETE FROM PracticeProgress WHERE user_id=?", (user_id,))
@@ -1646,15 +1817,17 @@ def create_practice_quiz():
                 return redirect(url_for("create_practice_quiz"))
 
             with get_db_connection() as conn:
-                cursor = conn.cursor()
-
                 # Insert quiz
                 print(f"DEBUG: Inserting quiz: quiz_name={title}, created_by={created_by}")
-                cursor.execute("""
+                quiz_id = _insert_and_get_id(
+                    conn,
+                    """
                     INSERT INTO Practice_Quizzes (quiz_name, description, created_by, teacher_id, target_departments)
                     VALUES (?, ?, ?, ?, ?)
-                """, (title, description, created_by, created_by, ",".join(selected_departments)))
-                quiz_id = cursor.lastrowid
+                    """,
+                    (title, description, created_by, created_by, ",".join(selected_departments)),
+                    "quiz_id"
+                )
                 print(f"DEBUG: Created quiz with ID: {quiz_id}")
                 ensure_legacy_practice_quiz_row(conn, quiz_id, title, description)
 
@@ -1667,11 +1840,15 @@ def create_practice_quiz():
                     if idx < len(question_images):
                         media_url = _save_question_image(question_images[idx])
                     
-                    cursor.execute("""
+                    question_id = _insert_and_get_id(
+                        conn,
+                        """
                         INSERT INTO PracticeQuestions (quiz_id, question_text, explanation, media_url)
                         VALUES (?, ?, ?, ?)
-                    """, (quiz_id, q_text, explanation, media_url))
-                    question_id = cursor.lastrowid
+                        """,
+                        (quiz_id, q_text, explanation, media_url),
+                        "question_id"
+                    )
                     print(f"DEBUG: Created question ID: {question_id}")
 
                     # Get the correct option for this question
@@ -1909,11 +2086,12 @@ def edit_practice_quiz(quiz_id):
                         
                         try:
                             # Insert question
-                            cursor = conn.execute(
+                            question_id = _insert_and_get_id(
+                                conn,
                                 "INSERT INTO PracticeQuestions (quiz_id, question_text, explanation, media_url, created_at) VALUES (?, ?, ?, ?, datetime('now'))",
-                                (quiz_id, q_text, explanation, media_url)
+                                (quiz_id, q_text, explanation, media_url),
+                                "question_id"
                             )
-                            question_id = cursor.lastrowid
                             print(f"DEBUG: Question inserted successfully with ID: {question_id}")
                             
                             # Map question fields by generated timestamp suffix
@@ -1994,11 +2172,12 @@ def add_practice_question(quiz_id):
             return redirect(url_for('list_practice_quizzes'))
         
         # Insert question
-        cur = conn.execute(
+        question_id = _insert_and_get_id(
+            conn,
             "INSERT INTO PracticeQuestions (quiz_id, question_text, explanation) VALUES (?, ?, ?)",
-            (quiz_id, question_text, explanation)
+            (quiz_id, question_text, explanation),
+            "question_id"
         )
-        question_id = cur.lastrowid
         
         # Insert options
         for i, opt in enumerate(options):
@@ -2120,8 +2299,9 @@ def delete_practice_quiz(quiz_id):
             
             print(f"DEBUG: Found quiz {quiz_id}, deleting related data...")
             
-            # Temporarily disable foreign key constraints during multi-table delete
-            conn.execute("PRAGMA foreign_keys = OFF")
+            # Temporarily disable foreign key constraints during multi-table delete (SQLite only)
+            if not conn.is_postgres:
+                conn.execute("PRAGMA foreign_keys = OFF")
             
             # 1️⃣ Delete options
             conn.execute("""
@@ -2148,8 +2328,9 @@ def delete_practice_quiz(quiz_id):
             except Exception:
                 pass
             
-            # Re-enable foreign key constraints
-            conn.execute("PRAGMA foreign_keys = ON")
+            # Re-enable foreign key constraints (SQLite only)
+            if not conn.is_postgres:
+                conn.execute("PRAGMA foreign_keys = ON")
             print(f"DEBUG: All deletions prepared for commit - quiz_id={quiz_id}")
         
         flash("Quiz deleted successfully ✅", "success")
@@ -3965,7 +4146,9 @@ def create_quiz(quiz_type):
 
                     question_id = q_cursor.lastrowid
 
-                    correct_code = correct_options_dict.get(str(i))
+                    correct_code = (correct_options_dict.get(str(i)) or "").strip().upper()
+                    if correct_code not in ("A", "B", "C", "D"):
+                        raise ValueError(f"Please select the correct option for question {i + 1}.")
 
                     options = [
                         ('A', option_a_list[i]),
@@ -5136,6 +5319,7 @@ def settings():
         user = conn.execute(
             """
             SELECT username, email, role,
+                   profile_pic,
                    COALESCE(theme_mode, 'light') AS theme_mode,
                    COALESCE(font_scale, 'medium') AS font_scale,
                    COALESCE(app_language, 'en') AS app_language,
@@ -5152,7 +5336,86 @@ def settings():
         flash("Account not found. Please login again.")
         return redirect(url_for('login'))
 
-    return render_template('shared/settings.html', user=user)
+    profile_pic = None
+    if user:
+        try:
+            profile_pic = user["profile_pic"]
+        except Exception:
+            profile_pic = None
+    avatar_url = _avatar_url_from_profile_pic(profile_pic)
+    return render_template('shared/settings.html', user=user, avatar_url=avatar_url)
+
+@app.route('/avatar_builder')
+@login_required
+def avatar_builder():
+    return render_template('shared/avatar.html')
+
+@app.route('/save_avatar', methods=['POST'])
+@login_required
+def save_avatar():
+    user_id = session['user_id']
+    profile_path = None
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        svg = (data.get("svg") or "").strip()
+        image_data = (data.get("image") or "").strip()
+        if svg:
+            profile_path = _save_avatar_svg(svg)
+        elif image_data:
+            profile_path = _save_avatar_data_url(image_data)
+    if not profile_path:
+        avatar_data = (request.form.get("avatar_data") or "").strip()
+        if avatar_data.startswith("data:image/"):
+            profile_path = _save_avatar_data_url(avatar_data)
+    if not profile_path:
+        return jsonify({"success": False, "message": "No avatar data provided"}), 400
+
+    with get_db_connection() as conn:
+        conn.execute("UPDATE Users SET profile_pic=? WHERE user_id=?", (profile_path, user_id))
+
+    return jsonify({"success": True, "avatar": profile_path})
+
+@app.route('/settings/avatar/upload', methods=['POST'])
+@login_required
+def upload_avatar():
+    user_id = session['user_id']
+    upload = request.files.get("avatar_file")
+    try:
+        profile_path = _save_avatar_upload(upload)
+    except ValueError as exc:
+        flash(str(exc))
+        return redirect(url_for('settings'))
+    if not profile_path:
+        flash("Please choose an image file.")
+        return redirect(url_for('settings'))
+
+    with get_db_connection() as conn:
+        conn.execute("UPDATE Users SET profile_pic=? WHERE user_id=?", (profile_path, user_id))
+    flash("Avatar updated.")
+    return redirect(url_for('settings'))
+
+@app.route('/settings/avatar/clear', methods=['POST'])
+@login_required
+def clear_avatar():
+    user_id = session['user_id']
+    with get_db_connection() as conn:
+        conn.execute("UPDATE Users SET profile_pic=NULL WHERE user_id=?", (user_id,))
+    flash("Avatar removed.")
+    return redirect(url_for('settings'))
+
+
+@app.route('/db_info')
+@login_required
+def db_info():
+    # Quick diagnostic: this app uses sqlite3 connections for app data.
+    db_url = os.environ.get('DATABASE_URL') or ''
+    info = {
+        "storage_engine": "postgresql" if USE_POSTGRES else "sqlite3",
+        "sqlite_path": None if USE_POSTGRES else DATABASE,
+        "database_url_set": bool(db_url),
+        "sqlalchemy_uri": app.config.get('SQLALCHEMY_DATABASE_URI')
+    }
+    return jsonify(info)
 
 @app.route('/settings/profile', methods=['POST'])
 @login_required
@@ -5445,9 +5708,10 @@ def join_quiz():
 
         # Insert student into participants table
         try:
+            user_id = session.get('user_id')
             conn.execute(
-                "INSERT INTO participants (session_id, nickname) VALUES (?, ?)",
-                (session_id, nickname)
+                "INSERT INTO participants (session_id, nickname, user_id) VALUES (?, ?, ?)",
+                (session_id, nickname, user_id)
             )
             conn.commit()
         except sqlite3.IntegrityError:
@@ -5626,6 +5890,14 @@ def teacher_live_quiz(session_id):
         return redirect('/teacher_dashboard')
 
     live_state = _get_live_question_state(conn, session_data)
+    try:
+        live_state["scoreboard_released"] = bool(session_data["scoreboard_released"])
+    except Exception:
+        live_state["scoreboard_released"] = False
+    try:
+        live_state["scoreboard_released"] = bool(session_data["scoreboard_released"])
+    except Exception:
+        live_state["scoreboard_released"] = False
     total_questions_row = conn.execute(
         "SELECT COUNT(*) AS total FROM questions WHERE quiz_id=?",
         (session_data["quiz_id"],)
@@ -5709,7 +5981,8 @@ def next_question(session_id):
     conn.execute("""
         UPDATE live_sessions
         SET current_question = ?,
-            question_started_at = datetime('now')
+            question_started_at = datetime('now'),
+            scoreboard_released = 0
         WHERE session_id=?
     """, (next_index, session_id))
 
@@ -5732,6 +6005,60 @@ def student_live_quiz(session_id):
     )
 
 
+@app.route('/student_scoreboard/<int:session_id>')
+def student_scoreboard(session_id):
+    player_name = (request.args.get('player') or session.get('student_nickname') or '').strip()
+    if not player_name:
+        return redirect('/join_quiz')
+
+    with get_db_connection() as conn:
+        session_data = conn.execute(
+            "SELECT * FROM live_sessions WHERE session_id=?",
+            (session_id,)
+        ).fetchone()
+        if not session_data:
+            flash("Session not found")
+            return redirect('/join_quiz')
+        try:
+            scoreboard_released = (session_data["scoreboard_released"] == 1)
+        except Exception:
+            scoreboard_released = False
+        if not scoreboard_released:
+            return redirect(url_for('student_live_quiz', session_id=session_id, player=player_name))
+
+        quiz_row = conn.execute(
+            "SELECT quiz_name FROM quizzes WHERE quiz_id=?",
+            (session_data["quiz_id"],)
+        ).fetchone()
+        total_row = conn.execute(
+            "SELECT COUNT(*) AS total FROM questions WHERE quiz_id=?",
+            (session_data["quiz_id"],)
+        ).fetchone()
+        scores = _get_live_leaderboard_rows(conn, session_id)
+        resolve_avatar = _get_live_avatar_map(conn, session_id)
+        scores = [
+            {**row, "avatar": resolve_avatar(row["player_name"])}
+            for row in scores
+        ]
+        resolve_avatar = _get_live_avatar_map(conn, session_id)
+        scores = [
+            {**row, "avatar": resolve_avatar(row["player_name"])}
+            for row in scores
+        ]
+
+    total_questions = total_row["total"] if total_row else 0
+    current_display = min((session_data["current_question"] or 0) + 1, total_questions if total_questions > 0 else 1)
+    return render_template(
+        'student/live_scoreboard.html',
+        session_id=session_id,
+        scores=scores,
+        quiz_name=quiz_row["quiz_name"] if quiz_row else "Live Quiz",
+        current_question=current_display,
+        total_questions=total_questions,
+        player_name=player_name
+    )
+
+
 @app.route('/start_live_quiz/<int:session_id>', methods=['POST'])
 def start_live_quiz(session_id):
     with get_db_connection() as conn:
@@ -5743,7 +6070,9 @@ def start_live_quiz(session_id):
                 current_question = 0,
                 start_time = datetime('now'),
                 question_started_at = datetime('now'),
-                is_active = 1
+                is_active = 1,
+                final_released = 0,
+                scoreboard_released = 0
             WHERE session_id = ?
         """, (session_id,))
     return jsonify({"success": True})
@@ -5910,18 +6239,40 @@ def get_current_question(session_id):
     live_state = _get_live_question_state(conn, session_data)
     viewer_name = (request.args.get('player_name') or '').strip() or session.get('student_nickname')
 
-    if live_state.get("finished"):
+    try:
+        final_released = (session_data["final_released"] == 1)
+    except Exception:
+        final_released = False
+    try:
+        scoreboard_released = (session_data["scoreboard_released"] == 1)
+    except Exception:
+        scoreboard_released = False
+
+    if final_released:
         final_url = url_for('final_podium', session_id=session_id)
         if viewer_name:
             final_url = url_for('final_podium', session_id=session_id, player=viewer_name)
+        live_state["final_podium_url"] = final_url
+
+    if live_state.get("finished"):
+        if final_released:
+            conn.close()
+            return jsonify({
+                "finished": True,
+                "started": True,
+                "leaderboard_url": final_url
+            })
         conn.close()
         return jsonify({
-            "finished": True,
+            "finished": False,
             "started": True,
-            "leaderboard_url": final_url
+            "hold_final": True
         })
 
     live_state["leaderboard_url"] = url_for('live_leaderboard', session_id=session_id)
+    live_state["scoreboard_released"] = scoreboard_released
+    if scoreboard_released:
+        live_state["scoreboard_url"] = url_for('student_scoreboard', session_id=session_id, player=viewer_name or "")
     if viewer_name and live_state.get("question_id"):
         your_row = _get_player_question_answer(conn, session_id, live_state["question_id"], viewer_name)
         live_state["your_name"] = viewer_name
@@ -5941,6 +6292,10 @@ def live_leaderboard(session_id):
         return redirect('/login')
 
     with get_db_connection() as conn:
+        conn.execute(
+            "UPDATE live_sessions SET scoreboard_released=1 WHERE session_id=?",
+            (session_id,)
+        )
         session_data = conn.execute(
             "SELECT * FROM live_sessions WHERE session_id=?",
             (session_id,)
@@ -5980,6 +6335,17 @@ def live_leaderboard(session_id):
         total_questions=total_questions
     )
 
+@app.route('/release_scoreboard/<int:session_id>')
+def release_scoreboard(session_id):
+    if session.get('role') != 'Teacher':
+        return redirect('/login')
+    with get_db_connection() as conn:
+        conn.execute(
+            "UPDATE live_sessions SET scoreboard_released=1 WHERE session_id=?",
+            (session_id,)
+        )
+    return redirect(url_for('live_leaderboard', session_id=session_id))
+
 @app.route('/final_podium/<int:session_id>')
 def final_podium(session_id):
     player_from_query = (request.args.get('player') or '').strip()
@@ -5996,6 +6362,11 @@ def final_podium(session_id):
         return redirect('/login')
 
     with get_db_connection() as conn:
+        if is_teacher:
+            conn.execute(
+                "UPDATE live_sessions SET final_released=1 WHERE session_id=?",
+                (session_id,)
+            )
         session_row = conn.execute(
             "SELECT quiz_id FROM live_sessions WHERE session_id=?",
             (session_id,)
@@ -6005,14 +6376,14 @@ def final_podium(session_id):
             return redirect('/student_dashboard')
 
         scores = _get_live_leaderboard_rows(conn, session_id)
+        resolve_avatar = _get_live_avatar_map(conn, session_id)
 
-    default_avatar = url_for('static', filename='avatars/default.png')
-    podium = []
-    for row in scores[:3]:
-        podium.append({
-            "player_name": row["player_name"],
-            "score": row["score"],
-            "avatar": default_avatar
+        podium = []
+        for row in scores[:3]:
+            podium.append({
+                "player_name": row["player_name"],
+                "score": row["score"],
+            "avatar": resolve_avatar(row["player_name"])
         })
 
     role = 'Student' if force_student_view else ('Teacher' if is_teacher else 'Student')
@@ -6063,6 +6434,18 @@ def final_podium(session_id):
     )
 
 
+@app.route('/release_final_podium/<int:session_id>')
+def release_final_podium(session_id):
+    if session.get('role') != 'Teacher':
+        return redirect('/login')
+    with get_db_connection() as conn:
+        conn.execute(
+            "UPDATE live_sessions SET final_released=1, is_active=0 WHERE session_id=?",
+            (session_id,)
+        )
+    return redirect(url_for('final_podium', session_id=session_id))
+
+
 @app.route('/live_leaderboard_data/<int:session_id>')
 def live_leaderboard_data(session_id):
     lite_mode = request.args.get("lite") == "1"
@@ -6087,6 +6470,11 @@ def live_leaderboard_data(session_id):
             (session_data["quiz_id"],)
         ).fetchone()
         scores = _get_live_leaderboard_rows(conn, session_id, limit=limit if lite_mode and limit > 0 else None)
+        resolve_avatar = _get_live_avatar_map(conn, session_id)
+        scores = [
+            {**row, "avatar": resolve_avatar(row["player_name"])}
+            for row in scores
+        ]
         question_ranking = {"top3": [], "rows": []}
         if not lite_mode:
             current_question_row = conn.execute(

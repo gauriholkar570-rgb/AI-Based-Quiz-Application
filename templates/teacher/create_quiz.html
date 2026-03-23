@@ -67,7 +67,7 @@
                         <button type="button" id="aiGenerateBtn" class="btn btn-outline-success">Generate</button>
                     </div>
                 </div>
-                <div id="aiStatus" class="small mt-2 text-muted">API key नसेल तर generator चालणार नाही. `OPENAI_API_KEY` set केल्यावर लगेच काम करेल.</div>
+                <div id="aiStatus" class="small mt-2 text-muted"></div>
             </div>
             
             <div id="questions" class="d-grid gap-3"></div>
@@ -81,7 +81,7 @@
 </div>
 
 <script>
-let index = 1;
+let index = 0;
 const isPracticeQuiz = {{ 'true' if quiz_type == 'practice' else 'false' }};
 const isLiveQuiz = {{ 'true' if quiz_type == 'live' else 'false' }};
 

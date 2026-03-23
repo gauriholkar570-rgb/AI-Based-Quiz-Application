@@ -131,7 +131,7 @@ body {
       {% for s in scores %}
       <div class="score-row">
         <div class="left">
-          <span class="avatar"></span>
+          <img class="avatar" src="{{ s['avatar'] }}" alt="avatar">
           <span class="name">{{ s['player_name'] }}</span>
         </div>
         <div class="points">{{ s['score'] }}</div>
@@ -173,7 +173,7 @@ function renderScores(data) {
   wrap.innerHTML = data.scores.map((s) => `
     <div class="score-row">
       <div class="left">
-        <span class="avatar"></span>
+        <img class="avatar" src="${esc(s.avatar)}" alt="avatar">
         <span class="name">${esc(s.player_name)}</span>
       </div>
       <div class="points">${s.score}</div>

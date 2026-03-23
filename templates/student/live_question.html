@@ -126,13 +126,6 @@
     <h2 id="questionBox" class="mb-3">Quiz will start shortly.</h2>
     <img id="questionImage" class="question-media d-none mb-3" alt="Question image">
     <div id="feedbackBox"></div>
-    <div id="scoreboardWrap" class="scoreboard-wrap d-none">
-      <div class="scoreboard-title">Scoreboard</div>
-      <div id="scoreboardList" class="scoreboard-list"></div>
-    </div>
-    <div id="finalControls" class="d-flex gap-2 flex-wrap mt-3 d-none">
-      <a id="finalPodiumBtn" class="btn btn-outline-danger" href="#">Show Final Podium</a>
-    </div>
     <div id="optionsBox" class="option-grid"></div>
   </div>
 </div>
@@ -148,7 +141,6 @@ let submittedThisQuestion = false;
 let quizEnded = false;
 let pollTimer = null;
 let lastSubmissionMeta = null;
-let lastScoreboardRefreshAt = 0;
 
 function esc(text) {
   return String(text || "").replace(/[&<>\"']/g, (s) => ({
@@ -228,8 +220,6 @@ function renderWaiting(text) {
   img.removeAttribute("src");
   document.getElementById("optionsBox").innerHTML = "";
   document.getElementById("feedbackBox").innerHTML = "";
-  document.getElementById("scoreboardWrap").classList.add("d-none");
-  document.getElementById("scoreboardList").innerHTML = "";
   document.getElementById("timerBadge").classList.add("d-none");
   showQuestionView();
 }
@@ -280,45 +270,10 @@ function renderQuestion(data) {
   showQuestionView();
 }
 
-function renderScoreboard(scores) {
-  const wrap = document.getElementById("scoreboardWrap");
-  const list = document.getElementById("scoreboardList");
-  wrap.classList.remove("d-none");
-
-  if (!scores || scores.length === 0) {
-    list.innerHTML = `<div class="alert alert-light mb-0 py-2">No submissions yet.</div>`;
-    return;
-  }
-
-  const target = (playerName || "").trim().toLowerCase();
-  list.innerHTML = scores.map((s, idx) => {
-    const name = (s.player_name || "").trim();
-    const isYou = target && name.toLowerCase() === target;
-    return `
-      <div class="score-row ${isYou ? "you" : ""}">
-        <span class="score-rank">#${idx + 1}</span>
-        <span class="score-name">${esc(name)}${isYou ? " (You)" : ""}</span>
-        <span class="score-points">${Number(s.score || 0)}</span>
-      </div>
-    `;
-  }).join("");
-}
-
-function refreshScoreboard() {
-  fetch(`/live_leaderboard_data/${sessionId}?lite=1&limit=20`)
-    .then(r => r.json())
-    .then(data => {
-      if (!data.success) return;
-      renderScoreboard(data.scores || []);
-    })
-    .catch(() => {});
-}
-
 function showReveal(data) {
   disableOptions();
   document.getElementById("timeLeft").innerText = 0;
   showFeedbackOnlyView();
-  document.getElementById("finalControls").classList.add("d-none");
 
   const meta = lastSubmissionMeta || {};
   const correct = data.your_submitted ? !!data.your_correct : false;
@@ -332,16 +287,12 @@ function showReveal(data) {
     your_points_to_next: meta.points_to_next,
     your_next_player: meta.next_player
   });
-  const now = Date.now();
-  if (!lastScoreboardRefreshAt || (now - lastScoreboardRefreshAt) >= 4000) {
-    lastScoreboardRefreshAt = now;
-    refreshScoreboard();
+  if (data.scoreboard_released) {
+    window.location.href = `/student_scoreboard/${sessionId}?player=${encodeURIComponent(playerName || "")}`;
+    return;
   }
   if (data.is_last_question) {
-    const finalUrl = `/final_podium/${sessionId}?player=${encodeURIComponent(playerName || "")}`;
-    const finalBtn = document.getElementById("finalPodiumBtn");
-    finalBtn.href = finalUrl;
-    document.getElementById("finalControls").classList.remove("d-none");
+    // Teacher will release final podium for students.
   }
 }
 
@@ -381,23 +332,18 @@ function submitAnswer(rawChoice, btn) {
 function renderFinished(finalUrl) {
   document.getElementById("metaTitle").innerText = "Quiz Finished";
   document.getElementById("timerBadge").classList.add("d-none");
-  document.getElementById("scoreboardWrap").classList.add("d-none");
-  document.getElementById("scoreboardList").innerHTML = "";
   document.getElementById("questionBox").classList.remove("d-none");
-  document.getElementById("questionBox").innerText = "Quiz completed.";
+  document.getElementById("questionBox").innerText = "Quiz completed. Waiting for teacher...";
   const img = document.getElementById("questionImage");
   img.classList.add("d-none");
   img.removeAttribute("src");
   document.getElementById("feedbackBox").innerHTML = `
     <div class="answer-feedback correct">
-      <div class="fb-title">Final Podium Ready</div>
+      <div class="fb-title">Final podium will appear when teacher releases it.</div>
     </div>
   `;
   document.getElementById("optionsBox").classList.add("d-none");
   document.getElementById("optionsBox").innerHTML = "";
-  const finalBtn = document.getElementById("finalPodiumBtn");
-  finalBtn.href = finalUrl;
-  document.getElementById("finalControls").classList.remove("d-none");
 }
 
 function pollState() {
@@ -412,8 +358,27 @@ function pollState() {
           clearInterval(pollTimer);
           pollTimer = null;
         }
-        const fallback = `/final_podium/${sessionId}?player=${encodeURIComponent(playerName || "")}`;
-        renderFinished(data.leaderboard_url || fallback);
+        if (data.leaderboard_url) {
+          window.location.href = data.leaderboard_url;
+          return;
+        }
+        renderFinished();
+        return;
+      }
+      if (data.final_podium_url) {
+        window.location.href = data.final_podium_url;
+        return;
+      }
+      if (data.hold_final) {
+        renderFinished();
+        return;
+      }
+      if (data.scoreboard_url) {
+        window.location.href = data.scoreboard_url;
+        return;
+      }
+      if (data.scoreboard_released) {
+        window.location.href = `/student_scoreboard/${sessionId}?player=${encodeURIComponent(playerName || "")}`;
         return;
       }
       if (!data.started) {
@@ -426,11 +391,7 @@ function pollState() {
         selectedAnswer = null;
         submittedThisQuestion = false;
         lastSubmissionMeta = null;
-        lastScoreboardRefreshAt = 0;
         document.getElementById("feedbackBox").innerHTML = "";
-        document.getElementById("scoreboardWrap").classList.add("d-none");
-        document.getElementById("scoreboardList").innerHTML = "";
-        document.getElementById("finalControls").classList.add("d-none");
       }
       if (currentQuestionId === data.question_id && data.phase === "question" && !data.your_submitted) {
         submittedThisQuestion = false;

@@ -35,6 +35,29 @@
         <div class="row g-4">
             <div class="col-12">
                 <div class="glass-card p-4">
+                    <h2 class="h5 mb-3">{{ 'Profile Photo / Avatar' if lang == 'en' else 'Profile Photo / Avatar' }}</h2>
+                    <div class="d-flex flex-column flex-md-row align-items-center gap-3">
+                        <img src="{{ avatar_url }}" alt="Avatar" class="rounded-circle" style="width:96px;height:96px;object-fit:cover;border:2px solid rgba(255,255,255,0.6);">
+                        <div class="flex-grow-1">
+                            <form method="POST" action="{{ url_for('upload_avatar') }}" enctype="multipart/form-data" class="row g-2 align-items-end">
+                                <div class="col-md-7">
+                                    <label class="form-label mb-1">{{ 'Upload Photo' if lang == 'en' else 'Upload Photo' }}</label>
+                                    <input type="file" name="avatar_file" class="form-control" accept="image/*" required>
+                                </div>
+                                <div class="col-md-5 d-grid gap-2">
+                                    <button type="submit" class="btn btn-brand">{{ 'Save Photo' if lang == 'en' else 'Save Photo' }}</button>
+                                    <a class="btn btn-outline-primary" href="{{ url_for('avatar_builder') }}">{{ 'Build Avatar' if lang == 'en' else 'Build Avatar' }}</a>
+                                </div>
+                            </form>
+                            <form method="POST" action="{{ url_for('clear_avatar') }}" class="mt-2">
+                                <button type="submit" class="btn btn-outline-light btn-sm">{{ 'Remove Avatar' if lang == 'en' else 'Remove Avatar' }}</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="glass-card p-4">
                     <h2 class="h5 mb-3">{{ 'Profile' if lang == 'en' else 'प्रोफाइल' }}</h2>
                     <form method="POST" action="{{ url_for('update_profile') }}" class="row g-3">
                         <div class="col-md-6">
