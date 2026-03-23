@@ -112,7 +112,7 @@ class DBConnection:
         if not self.is_postgres:
             return sql
         # Convert qmark placeholders to psycopg2 style.
-        return re.sub(r"\\?", "%s", sql)
+        return re.sub(r"\?", "%s", sql)
 
     def execute(self, sql, params=None):
         if not self.is_postgres:
