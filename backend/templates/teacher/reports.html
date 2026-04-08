@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Performance Reports</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui-system.css') }}" rel="stylesheet">
+</head>
+<body class="app-bg theme-{{ session.get('theme_mode', 'light') }} font-{{ session.get('font_scale', 'medium') }}">
+<nav class="navbar navbar-expand-lg topbar">
+    <div class="container-fluid">
+        <span class="navbar-brand">Performance Reports</span>
+        <a href="{{ url_for('teacher_dashboard') }}" class="btn btn-outline-primary btn-sm">Back</a>
+    </div>
+</nav>
+
+<div class="page-wrap">
+    <div class="section-hero mb-3">
+        <h2>Live vs Practice Comparison</h2>
+        <p>Combined view across all your quizzes.</p>
+    </div>
+
+    <div class="d-flex gap-2 mb-3">
+        <a class="btn btn-outline-success btn-sm" href="{{ url_for('teacher_reports_export') }}">Download Excel</a>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-3 h-100">
+                <div class="text-muted">Total Students</div>
+                <div class="h4 mb-0">{{ summary['total_students'] }}</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-3 h-100">
+                <div class="text-muted">Avg Live Score</div>
+                <div class="h4 mb-0">{{ summary['avg_live_score'] }}</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-3 h-100">
+                <div class="text-muted">Avg Practice Score</div>
+                <div class="h4 mb-0">{{ summary['avg_practice_score'] }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card p-3 mb-3">
+        {% if rows %}
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Live Avg Score</th>
+                        <th>Live Sessions</th>
+                        <th>Practice Avg Score</th>
+                        <th>Practice Attempts</th>
+                        <th>Combined Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td>{{ row['student_name'] }}</td>
+                        <td>{{ row['live_avg_score'] }}</td>
+                        <td>{{ row['live_sessions'] }}</td>
+                        <td>{{ row['practice_avg_score'] }}</td>
+                        <td>{{ row['practice_attempts'] }}</td>
+                        <td><strong>{{ row['combined_score'] }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="mb-0">No report data yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="glass-card p-3">
+        <h6 class="mb-2">Top Performers</h6>
+        {% if summary['top_performers'] %}
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Combined Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in summary['top_performers'] %}
+                    <tr>
+                        <td>{{ row['student_name'] }}</td>
+                        <td><strong>{{ row['combined_score'] }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="mb-0">No top performers yet.</p>
+        {% endif %}
+    </div>
+</div>
+</body>
+</html>

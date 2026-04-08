@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Study Tools - Quiz App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui-system.css') }}" rel="stylesheet">
+<style>
+.mini-title { font-weight: 800; color: #0c4a6e; }
+.list-box { max-height: 260px; overflow-y: auto; }
+.flashcard-item { perspective: 1000px; min-height: 120px; cursor: pointer; }
+.flash-inner { position: relative; width: 100%; min-height: 120px; transition: transform .4s; transform-style: preserve-3d; }
+.flashcard-item.flipped .flash-inner { transform: rotateY(180deg); }
+.flash-face { position: absolute; width: 100%; min-height: 120px; backface-visibility: hidden; border-radius: 12px; padding: 12px; border: 1px solid var(--border); background: var(--card); }
+.flash-back { transform: rotateY(180deg); }
+.mind-map { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.mind-node { border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; background: rgba(56,189,248,.12); font-weight: 700; }
+.danger-zone { border: 1px solid rgba(239,68,68,.35); background: rgba(254,226,226,.6); border-radius: 12px; padding: 12px; }
+body.app-bg.theme-dark .mini-title { color: #7dd3fc; }
+</style>
+</head>
+<body class="app-bg theme-{{ session.get('theme_mode', 'light') }} font-{{ session.get('font_scale', 'medium') }}">
+<nav class="navbar navbar-expand-lg topbar">
+    <div class="container-fluid">
+        <span class="navbar-brand">Quiz App</span>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('student_dashboard') }}" class="btn btn-outline-primary btn-sm">Dashboard</a>
+            <a href="{{ url_for('settings') }}" class="btn btn-outline-primary btn-sm">Settings</a>
+        </div>
+    </div>
+</nav>
+
+<div class="page-wrap">
+    <h1 class="page-title">Study Independent Tools</h1>
+
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class="mb-3">
+        {% for message in messages %}
+        <div class="alert alert-info mb-2">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <div class="row g-4">
+        <div class="col-12 col-xl-6">
+            <div class="glass-card p-3 h-100">
+                <h2 class="mini-title">Notes Section</h2>
+                <form method="POST" action="{{ url_for('add_study_note') }}" class="row g-2 mb-3">
+                    <div class="col-12"><input name="title" class="form-control" placeholder="Note title" required></div>
+                    <div class="col-12"><textarea name="content" class="form-control" rows="3" placeholder="Write your notes" required></textarea></div>
+                    <div class="col-12"><button class="btn btn-brand btn-sm" type="submit">Save Note</button></div>
+                </form>
+                <div class="list-box">
+                    {% for n in notes %}
+                    <div class="quiz-editor-card mb-2">
+                        <div class="d-flex justify-content-between"><strong>{{ n['title'] }}</strong><small>{{ n['updated_at'] }}</small></div>
+                        <div class="small mt-1">{{ n['content'] }}</div>
+                        <form method="POST" action="{{ url_for('delete_study_note', note_id=n['note_id']) }}" class="mt-2">
+                            <button class="btn btn-outline-danger btn-sm">Delete</button>
+                        </form>
+                    </div>
+                    {% else %}<p class="empty-text">No notes yet.</p>{% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-6">
+            <div class="glass-card p-3 h-100">
+                <h2 class="mini-title">Flashcards</h2>
+                <form method="POST" action="{{ url_for('add_flashcard') }}" class="row g-2 mb-3">
+                    <div class="col-md-6"><input name="front_text" class="form-control" placeholder="Front: Concept" required></div>
+                    <div class="col-md-6"><input name="back_text" class="form-control" placeholder="Back: Explanation" required></div>
+                    <div class="col-12"><button class="btn btn-brand btn-sm" type="submit">Add Flashcard</button></div>
+                </form>
+                <div class="list-box">
+                    {% for c in flashcards %}
+                    <div class="flashcard-item mb-2" onclick="this.classList.toggle('flipped')">
+                        <div class="flash-inner">
+                            <div class="flash-face"><strong>Q:</strong> {{ c['front_text'] }}</div>
+                            <div class="flash-face flash-back"><strong>A:</strong> {{ c['back_text'] }}</div>
+                        </div>
+                    </div>
+                    <form method="POST" action="{{ url_for('delete_flashcard', card_id=c['card_id']) }}" class="mb-2">
+                        <button class="btn btn-outline-danger btn-sm">Delete</button>
+                    </form>
+                    {% else %}<p class="empty-text">No flashcards yet.</p>{% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="glass-card p-3 h-100">
+                <h2 class="mini-title">Study Timer / Pomodoro</h2>
+                <div class="row g-2 mb-2">
+                    <div class="col-4"><input id="focusMinutes" type="number" class="form-control" value="25" min="1"></div>
+                    <div class="col-4"><input id="breakMinutes" type="number" class="form-control" value="5" min="1"></div>
+                    <div class="col-4"><input id="cyclesCount" type="number" class="form-control" value="1" min="1"></div>
+                </div>
+                <div class="d-flex gap-2 mb-2">
+                    <button class="btn btn-brand btn-sm" type="button" onclick="startPomodoro()">Start</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="resetPomodoro()">Reset</button>
+                </div>
+                <h3 id="pomodoroDisplay" class="mb-2">25:00</h3>
+                <div id="pomodoroPhase" class="chip mb-3">Focus</div>
+                <form id="pomodoroLogForm" method="POST" action="{{ url_for('log_pomodoro') }}">
+                    <input type="hidden" name="focus_minutes" id="logFocusMinutes" value="25">
+                    <input type="hidden" name="break_minutes" id="logBreakMinutes" value="5">
+                    <input type="hidden" name="cycles_completed" id="logCyclesCompleted" value="1">
+                    <button class="btn btn-success-solid btn-sm" type="submit">Log Session</button>
+                </form>
+                <hr>
+                <div class="list-box">
+                    {% for p in pomodoro_logs %}
+                    <div class="quiz-editor-card mb-2">Focus {{ p['focus_minutes'] }}m + Break {{ p['break_minutes'] }}m, cycles {{ p['cycles_completed'] }} ({{ p['logged_at'] }})</div>
+                    {% else %}<p class="empty-text">No pomodoro logs yet.</p>{% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="glass-card p-3 h-100">
+                <h2 class="mini-title">Daily Goals</h2>
+                <form method="POST" action="{{ url_for('add_daily_goal') }}" class="row g-2 mb-3">
+                    <div class="col-8"><input name="goal_text" class="form-control" placeholder="Today's goal" required></div>
+                    <div class="col-4"><input type="date" name="target_date" class="form-control"></div>
+                    <div class="col-12"><button class="btn btn-brand btn-sm">Add Goal</button></div>
+                </form>
+                <div class="list-box">
+                    {% for g in goals %}
+                    <div class="quiz-editor-card mb-2 d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ g['goal_text'] }}</strong>
+                            <div class="small">Target: {{ g['target_date'] or '-' }}</div>
+                        </div>
+                        <div class="d-flex gap-1">
+                            <form method="POST" action="{{ url_for('toggle_daily_goal', goal_id=g['goal_id']) }}">
+                                <button class="btn btn-outline-success btn-sm">{{ 'Undo' if g['is_completed'] else 'Done' }}</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('delete_daily_goal', goal_id=g['goal_id']) }}">
+                                <button class="btn btn-outline-danger btn-sm">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% else %}<p class="empty-text">No goals yet.</p>{% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-6">
+            <div class="glass-card p-3 h-100">
+                <h2 class="mini-title">Progress Journal</h2>
+                <form method="POST" action="{{ url_for('add_study_journal') }}" class="row g-2 mb-3">
+                    <div class="col-md-4"><input type="date" name="study_date" class="form-control" value="{{ '' }}"></div>
+                    <div class="col-md-4"><input type="number" name="minutes_spent" class="form-control" placeholder="Minutes"></div>
+                    <div class="col-md-4"><input name="topics" class="form-control" placeholder="Topics covered" required></div>
+                    <div class="col-12"><textarea name="notes" class="form-control" rows="2" placeholder="Daily log note"></textarea></div>
+                    <div class="col-12"><button class="btn btn-brand btn-sm">Add Journal Entry</button></div>
+                </form>
+                <div class="list-box">
+                    {% for j in journal_logs %}
+                    <div class="quiz-editor-card mb-2">
+                        <strong>{{ j['study_date'] }} - {{ j['minutes_spent'] }} min</strong>
+                        <div class="small">Topics: {{ j['topics'] }}</div>
+                        <div class="small">{{ j['notes'] }}</div>
+                        <form method="POST" action="{{ url_for('delete_study_journal', journal_id=j['journal_id']) }}" class="mt-2">
+                            <button class="btn btn-outline-danger btn-sm">Delete</button>
+                        </form>
+                    </div>
+                    {% else %}<p class="empty-text">No journal entries yet.</p>{% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-6">
+            <div class="glass-card p-3 h-100">
+                <h2 class="mini-title">Resource Library</h2>
+                <form method="POST" action="{{ url_for('add_resource') }}" class="row g-2 mb-3">
+                    <div class="col-md-5"><input name="title" class="form-control" placeholder="Resource title" required></div>
+                    <div class="col-md-3">
+                        <select name="resource_type" class="form-select">
+                            <option value="link">Link</option>
+                            <option value="pdf">PDF</option>
+                            <option value="reference">Reference</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4"><input name="url" class="form-control" placeholder="https://..." required></div>
+                    <div class="col-12"><textarea name="description" class="form-control" rows="2" placeholder="Description"></textarea></div>
+                    <div class="col-12"><button class="btn btn-brand btn-sm">Add Resource</button></div>
+                </form>
+                <div class="list-box">
+                    {% for r in resources %}
+                    <div class="quiz-editor-card mb-2">
+                        <strong>{{ r['title'] }}</strong> <span class="chip">{{ r['resource_type'] }}</span>
+                        <div><a href="{{ r['url'] }}" target="_blank" rel="noopener">{{ r['url'] }}</a></div>
+                        <div class="small">{{ r['description'] }}</div>
+                        <form method="POST" action="{{ url_for('delete_resource', resource_id=r['resource_id']) }}" class="mt-2">
+                            <button class="btn btn-outline-danger btn-sm">Delete</button>
+                        </form>
+                    </div>
+                    {% else %}<p class="empty-text">No resources yet.</p>{% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="glass-card p-3 h-100">
+                <h2 class="mini-title">Reminders</h2>
+                <form method="POST" action="{{ url_for('add_reminder') }}" class="row g-2 mb-3">
+                    <div class="col-8"><input name="title" class="form-control" placeholder="Reminder title" required></div>
+                    <div class="col-4"><input type="date" name="due_date" class="form-control"></div>
+                    <div class="col-12"><button class="btn btn-brand btn-sm">Add Reminder</button></div>
+                </form>
+                <div class="list-box">
+                    {% for rm in reminders %}
+                    <div class="quiz-editor-card mb-2 d-flex justify-content-between align-items-center">
+                        <div><strong>{{ rm['title'] }}</strong><div class="small">Due: {{ rm['due_date'] or '-' }}</div></div>
+                        <div class="d-flex gap-1">
+                            <form method="POST" action="{{ url_for('toggle_reminder', reminder_id=rm['reminder_id']) }}">
+                                <button class="btn btn-outline-success btn-sm">{{ 'Undo' if rm['is_done'] else 'Done' }}</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('delete_reminder', reminder_id=rm['reminder_id']) }}">
+                                <button class="btn btn-outline-danger btn-sm">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% else %}<p class="empty-text">No reminders yet.</p>{% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="glass-card p-3 h-100">
+                <h2 class="mini-title">Self-Assessment Checklist</h2>
+                <form method="POST" action="{{ url_for('add_assessment_item') }}" class="row g-2 mb-3">
+                    <div class="col-md-4"><input name="topic_name" class="form-control" placeholder="Topic" required></div>
+                    <div class="col-md-3">
+                        <select name="status" class="form-select">
+                            <option value="strong">Strong</option>
+                            <option value="learning">Learning</option>
+                            <option value="revise">Need Revise</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5"><input name="notes" class="form-control" placeholder="Remarks"></div>
+                    <div class="col-12"><button class="btn btn-brand btn-sm">Add Checklist Item</button></div>
+                </form>
+                <div class="list-box">
+                    {% for a in assessments %}
+                    <div class="quiz-editor-card mb-2">
+                        <strong>{{ a['topic_name'] }}</strong> <span class="chip">{{ a['status'] }}</span>
+                        <div class="small">{{ a['notes'] }}</div>
+                        <form method="POST" action="{{ url_for('delete_assessment_item', assessment_id=a['assessment_id']) }}" class="mt-2">
+                            <button class="btn btn-outline-danger btn-sm">Delete</button>
+                        </form>
+                    </div>
+                    {% else %}<p class="empty-text">No checklist items yet.</p>{% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="glass-card p-3">
+                <h2 class="mini-title">Mind Map Tool</h2>
+                <form method="POST" action="{{ url_for('add_mind_map') }}" class="row g-2 mb-3">
+                    <div class="col-md-3"><input name="title" class="form-control" placeholder="Map title" required></div>
+                    <div class="col-md-3"><input name="central_topic" class="form-control" placeholder="Central concept" required></div>
+                    <div class="col-md-6"><input name="related_topics" class="form-control" placeholder="Related topics comma separated"></div>
+                    <div class="col-12"><button class="btn btn-brand btn-sm">Save Mind Map</button></div>
+                </form>
+                <div class="row g-2">
+                    {% for m in mind_maps %}
+                    <div class="col-12 col-lg-6">
+                        <div class="quiz-editor-card">
+                            <div class="d-flex justify-content-between">
+                                <strong>{{ m['title'] }}</strong>
+                                <form method="POST" action="{{ url_for('delete_mind_map', map_id=m['map_id']) }}">
+                                    <button class="btn btn-outline-danger btn-sm">Delete</button>
+                                </form>
+                            </div>
+                            <div class="mind-map mt-2">
+                                <span class="mind-node">{{ m['central_topic'] }}</span>
+                                {% for topic in (m['related_topics'] or '').split(',') %}
+                                {% if topic.strip() %}
+                                <span class="mind-node">{{ topic.strip() }}</span>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}<p class="empty-text">No mind maps yet.</p>{% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let pomodoroSeconds = 25 * 60;
+let pomodoroInterval = null;
+let isFocus = true;
+let completedCycles = 0;
+
+function formatTime(sec) {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+}
+
+function syncPomodoroInputs() {
+    const f = Math.max(1, parseInt(document.getElementById('focusMinutes').value || '25', 10));
+    const b = Math.max(1, parseInt(document.getElementById('breakMinutes').value || '5', 10));
+    const c = Math.max(1, parseInt(document.getElementById('cyclesCount').value || '1', 10));
+    document.getElementById('logFocusMinutes').value = f;
+    document.getElementById('logBreakMinutes').value = b;
+    document.getElementById('logCyclesCompleted').value = c;
+}
+
+function startPomodoro() {
+    syncPomodoroInputs();
+    if (pomodoroInterval) return;
+    pomodoroInterval = setInterval(() => {
+        pomodoroSeconds--;
+        document.getElementById('pomodoroDisplay').textContent = formatTime(Math.max(0, pomodoroSeconds));
+        if (pomodoroSeconds <= 0) {
+            const focusMin = parseInt(document.getElementById('focusMinutes').value || '25', 10);
+            const breakMin = parseInt(document.getElementById('breakMinutes').value || '5', 10);
+            if (isFocus) {
+                isFocus = false;
+                pomodoroSeconds = breakMin * 60;
+                document.getElementById('pomodoroPhase').textContent = 'Break';
+            } else {
+                isFocus = true;
+                completedCycles++;
+                pomodoroSeconds = focusMin * 60;
+                document.getElementById('pomodoroPhase').textContent = 'Focus';
+                document.getElementById('logCyclesCompleted').value = completedCycles || 1;
+            }
+        }
+    }, 1000);
+}
+
+function resetPomodoro() {
+    clearInterval(pomodoroInterval);
+    pomodoroInterval = null;
+    isFocus = true;
+    completedCycles = 0;
+    const focusMin = Math.max(1, parseInt(document.getElementById('focusMinutes').value || '25', 10));
+    pomodoroSeconds = focusMin * 60;
+    document.getElementById('pomodoroDisplay').textContent = formatTime(pomodoroSeconds);
+    document.getElementById('pomodoroPhase').textContent = 'Focus';
+    syncPomodoroInputs();
+}
+
+resetPomodoro();
+</script>
+</body>
+</html>

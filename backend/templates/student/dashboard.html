@@ -1,0 +1,61 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Student Dashboard - Quiz App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui-system.css') }}" rel="stylesheet">
+</head>
+{% set lang = session.get('app_language', 'en') %}
+<body class="app-bg theme-{{ session.get('theme_mode', 'light') }} font-{{ session.get('font_scale', 'medium') }}">
+<nav class="navbar navbar-expand-lg topbar">
+    <div class="container-fluid">
+        <span class="navbar-brand">Quiz App</span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="hello me-2">{{ 'Hello' if lang == 'en' else 'नमस्कार' }}, {{ session['username'] }}</span>
+            <a href="{{ url_for('settings') }}" class="btn btn-outline-primary btn-sm">{{ 'Settings' if lang == 'en' else 'सेटिंग्ज' }}</a>
+            <a href="/logout" class="btn btn-outline-danger btn-sm">{{ 'Logout' if lang == 'en' else 'लॉगआउट' }}</a>
+        </div>
+    </div>
+</nav>
+
+<div class="page-wrap">
+    <h1 class="page-title">{{ 'Student Dashboard' if lang == 'en' else 'विद्यार्थी डॅशबोर्ड' }}</h1>
+
+    <div class="row g-4">
+        <div class="col-12 col-md-6">
+            <div class="glass-card action-card p-4">
+                <h2 class="mb-3">Live Quiz</h2>
+                <p class="mb-4">Join a live classroom quiz hosted by your teacher.</p>
+                <a href="/join_quiz" class="btn btn-brand w-100 btn-lg">Join Quiz</a>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-6">
+            <div class="glass-card action-card p-4">
+                <h2 class="mb-3">Practice Quiz</h2>
+                <p class="mb-4">Browse practice quizzes and solve them at your pace.</p>
+                <a href="/student_practice_quizzes" class="btn btn-brand w-100 btn-lg">Browse Quizzes</a>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="glass-card action-card p-4">
+                <h2 class="mb-3">Daily Learning</h2>
+                <p class="mb-4">Read daily tips, maintain streaks, and earn reward points.</p>
+                <a href="/daily_learning" class="btn btn-success-solid w-100 btn-lg">Open Daily Tip</a>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="glass-card action-card p-4">
+                <h2 class="mb-3">Study Tools</h2>
+                <p class="mb-4">Notes, flashcards, pomodoro, daily goals, journal, resources, reminders, mind maps, and self-assessment checklist.</p>
+                <a href="/student_study_tools" class="btn btn-brand w-100 btn-lg">Open Study Tools</a>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

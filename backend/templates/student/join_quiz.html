@@ -1,0 +1,45 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Join Quiz</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui-system.css') }}" rel="stylesheet">
+</head>
+<body class="app-bg theme-{{ session.get('theme_mode', 'light') }} font-{{ session.get('font_scale', 'medium') }}">
+<nav class="navbar navbar-expand-lg topbar">
+    <div class="container-fluid">
+        <span class="navbar-brand">Quiz App</span>
+        <a href="{{ url_for('student_dashboard') }}" class="btn btn-outline-primary btn-sm">Back</a>
+    </div>
+</nav>
+
+<div class="page-wrap" style="max-width:620px;">
+    <div class="section-hero mb-3">
+        <h2>Join Live Quiz</h2>
+        <p>Enter your game PIN and nickname to enter the live room.</p>
+    </div>
+
+    <div class="glass-card p-4 module-form">
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="alert alert-danger">{{ messages[0] }}</div>
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('join_quiz') }}" class="d-grid gap-3">
+            <div>
+                <label class="form-label">Game PIN</label>
+                <input type="text" name="pin" class="form-control form-control-lg" placeholder="Enter PIN" required>
+            </div>
+            <div>
+                <label class="form-label">Nickname</label>
+                <input type="text" name="nickname" class="form-control form-control-lg" placeholder="Enter nickname" required>
+            </div>
+            <button type="submit" class="btn btn-brand btn-lg w-100">Join Quiz</button>
+        </form>
+    </div>
+</div>
+</body>
+</html>

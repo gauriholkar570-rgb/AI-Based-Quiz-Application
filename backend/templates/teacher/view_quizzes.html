@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Quizzes | Teacher</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #46178f, #7b2cbf);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container-quizzes {
+            max-width: 1200px;
+            margin: 50px auto;
+        }
+
+        .quiz-card {
+            background: #ffffff;
+            color: #000;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .quiz-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+        }
+
+        .quiz-card h5 {
+            font-weight: 600;
+        }
+
+        .quiz-card p {
+            color: #555;
+        }
+
+        .no-quiz-msg {
+            text-align: center;
+            margin-top: 50px;
+            font-size: 20px;
+            color: #fff;
+        }
+
+        .section-title {
+            margin-bottom: 30px;
+            font-size: 28px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        a.create-link {
+            color: #00c853;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        a.create-link:hover {
+            text-decoration: underline;
+        }
+
+        .quiz-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+    </style>
+</head>
+
+<body>
+<div class="container container-quizzes">
+    <h2 class="section-title">
+        <i class="fa-solid fa-book-open"></i> My Created Quizzes
+    </h2>
+
+    {% if quizzes and quizzes|length > 0 %}
+        <div class="row">
+            {% for quiz in quizzes %}
+                <div class="col-md-4">
+                    <div class="quiz-card">
+                        <h5>{{ quiz['title'] }}</h5>
+                        <p>{{ quiz['description'] or "No description available" }}</p>
+
+                        <p><strong>PIN:</strong> {{ quiz['pin'] or "Not started" }}</p>
+                        <p><strong>Total Questions:</strong> {{ quiz['total_questions'] or 0 }}</p>
+
+                        <!-- ACTION BUTTONS -->
+                        <div class="quiz-actions mt-3">
+
+                            <!-- Start Quiz -->
+                            <a href="/start_quiz/{{ quiz['id'] }}" class="btn btn-success btn-sm">
+                                <i class="fa-solid fa-qrcode"></i> Start
+                            </a>
+
+                            <!-- View Quiz -->
+                            <a href="/view_quiz/{{ quiz['id'] }}" class="btn btn-primary btn-sm">
+                                <i class="fa-solid fa-eye"></i> View
+                            </a>
+
+                            <!-- Add Question -->
+                            <a href="/add_question/{{ quiz['id'] }}" class="btn btn-warning btn-sm">
+                                <i class="fa-solid fa-plus"></i> Add
+                            </a>
+
+                            <!-- DELETE QUIZ (POST) -->
+                            <form action="{{ url_for('delete_quiz', quiz_id=quiz['id']) }}"
+                                  method="POST"
+                                  onsubmit="return confirm('Are you sure you want to delete this quiz?');"
+                                  style="display:inline;">
+                                <button type="submit" class="btn btn-danger btn-sm">
+                                    <i class="fa-solid fa-trash"></i> Delete
+                                </button>
+                            </form>
+
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="no-quiz-msg">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <p>
+                No quizzes created yet.
+                Click <a href="/create_quiz" class="create-link">here</a> to create your first quiz!
+            </p>
+        </div>
+    {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

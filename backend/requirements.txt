@@ -1,0 +1,9 @@
+flask 
+flask-sqlalchemy 
+flask-cors 
+openai 
+python-dotenv 
+Werkzeug 
+PyPDF2 
+openpyxl 
+psycopg2-binary 

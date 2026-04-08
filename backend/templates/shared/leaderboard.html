@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Leaderboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+body { background:#dfe6e9; font-family:'Segoe UI',sans-serif; min-height:100vh; display:flex; justify-content:center; align-items:center; }
+.card { width:90%; max-width:500px; padding:20px; border-radius:15px; background:#fff; box-shadow:0 8px 25px rgba(0,0,0,0.3); text-align:center; }
+</style>
+</head>
+<body>
+<div class="card">
+    <h3>Leaderboard</h3>
+    <ol class="list-group list-group-numbered mt-3">
+        {% for s in scores %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            Player {{ loop.index }}
+            <span class="badge bg-primary rounded-pill">{{ s['score'] }}</span>
+        </li>
+        {% endfor %}
+    </ol>
+</div>
+</body>
+</html>

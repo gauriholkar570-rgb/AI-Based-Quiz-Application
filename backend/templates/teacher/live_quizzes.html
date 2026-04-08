@@ -1,0 +1,75 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Live Quizzes - Quiz App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/ui-system.css') }}" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body class="app-bg">
+<nav class="navbar navbar-expand-lg topbar">
+    <div class="container-fluid">
+        <span class="navbar-brand">Live Quizzes</span>
+        <a href="{{ url_for('teacher_dashboard') }}" class="btn btn-outline-primary btn-sm">Back to Dashboard</a>
+    </div>
+</nav>
+
+<div class="page-wrap">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="page-title mb-0">My Live Quizzes</h1>
+        <a href="/create_quiz/live" class="btn btn-brand">Create Live Quiz</a>
+    </div>
+
+    {% if quizzes %}
+    <div class="row quiz-grid">
+        {% for quiz in quizzes %}
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="glass-card section-card card h-100">
+                <div class="card-header">{{ quiz['quiz_name'] }}</div>
+                <div class="card-body d-flex flex-column">
+                    <p>{{ quiz['description'] or "No description" }}</p>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <span class="stat-badge">Questions: {{ quiz['question_count'] or 0 }}</span>
+                        <span class="stat-badge">Created: {{ quiz['created_at'][:10] }}</span>
+                    </div>
+                    <div class="d-grid gap-2 mt-auto">
+                        <a href="/start_quiz/{{ quiz['quiz_id'] }}" class="btn btn-brand btn-sm">Start</a>
+                        <a href="{{ url_for('teacher_live_quiz_results', quiz_id=quiz['quiz_id']) }}" class="btn btn-outline-success btn-sm">Results</a>
+                        <a href="/edit_quiz/{{ quiz['quiz_id'] }}" class="btn btn-outline-primary btn-sm">Edit</a>
+                        <form id="delete-quiz-{{ quiz.quiz_id }}" method="POST" action="{{ url_for('delete_quiz', quiz_id=quiz.quiz_id) }}">
+                            <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="confirmDeleteQuiz({{ quiz.quiz_id }})">
+                                Delete
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+        <p class="empty-text">No live quizzes created yet.</p>
+    {% endif %}
+</div>
+
+<script>
+function confirmDeleteQuiz(quizId) {
+    Swal.fire({
+        title: 'Are you sure?',
+        text: 'This will permanently delete the quiz and all its data!',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#0284c7',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            document.getElementById('delete-quiz-' + quizId).submit();
+        }
+    });
+}
+</script>
+</body>
+</html>
