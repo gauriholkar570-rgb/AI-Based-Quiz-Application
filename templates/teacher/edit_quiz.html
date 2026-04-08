@@ -142,9 +142,14 @@ function addQuestion(){
     <div class="quiz-card">
         <input type="hidden" name="new_question[]" value="1">
 
-        <input class="form-control question-input mb-3"
-        name="question_text[]" placeholder="Enter your question" required>
+        <textarea class="form-control question-input mb-3"
+        name="question_text[]" rows="3" placeholder="Enter your question" required></textarea>
         <input type="file" name="new_question_image[]" class="form-control mb-3" accept="image/*">
+
+        <div class="mb-3">
+            <label class="form-label">Timer for this question (seconds)</label>
+            <input type="number" name="time_limit_new[]" class="form-control" value="20" min="5" max="300" required>
+        </div>
 
         <div class="option optA">
             <input type="radio" name="correct_${i}" value="A" onclick="highlight(this)">
@@ -198,13 +203,18 @@ function toggleTheme(){
 
 <input type="hidden" name="question_id[]" value="{{ item.question['question_id'] }}">
 
-<input class="form-control question-input mb-3"
+<textarea class="form-control question-input mb-3"
 name="question_text[]"
-value="{{ item.question['question_text'] }}" required>
+rows="3" required>{{ item.question['question_text'] }}</textarea>
 {% if item.question['media_url'] %}
-<img src="{{ url_for('static', filename=item.question['media_url']) }}" alt="Question image" class="question-preview">
+<img src="{{ media_url(item.question['media_url']) }}" alt="Question image" class="question-preview">
 {% endif %}
 <input type="file" name="question_image_existing[]" class="form-control mb-3" accept="image/*">
+
+<div class="mb-3">
+    <label class="form-label">Timer for this question (seconds)</label>
+    <input type="number" name="time_limit_existing[]" class="form-control" value="{{ item.question['time_limit'] or 20 }}" min="5" max="300" required>
+</div>
 
 {% for opt in item.options %}
 <div class="option
@@ -249,3 +259,4 @@ onclick="return confirm('Delete this question?')">
 </div>
 </body>
 </html>
+

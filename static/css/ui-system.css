@@ -240,6 +240,37 @@ body.app-bg.theme-dark .page-title {
     font-weight: 700;
 }
 
+.ai-generator {
+    border-radius: 20px;
+    padding-top: 20px;
+    padding-bottom: 20px;
+}
+
+.ai-generator .form-control,
+.ai-generator .form-select {
+    border-radius: 12px;
+    min-height: 44px;
+}
+
+.ai-generator .btn-outline-success {
+    border-radius: 12px;
+    font-weight: 800;
+    padding: 10px 14px;
+    min-height: 44px;
+}
+
+.ai-generator .btn-outline-success.ai-generate-btn {
+    border-color: #16a34a;
+    color: #15803d;
+    background: #ffffff;
+}
+
+.ai-generator .btn-outline-success.ai-generate-btn:hover {
+    background: #dcfce7;
+    border-color: #15803d;
+    color: #166534;
+}
+
 .quiz-editor-card {
     background: #f8fdff;
     border: 1px solid #dbeafe;
@@ -255,6 +286,10 @@ body.app-bg.theme-dark .page-title {
 
 .option-line input[type="text"] {
     flex: 1;
+}
+
+.question-text {
+    white-space: pre-wrap;
 }
 
 .auth-shell {

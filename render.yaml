@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: oqa-flask
+    runtime: python
+    rootDir: oqa
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn backend.app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: FLASK_SECRET_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        value: https://openrouter.ai/api/v1
+      - key: OPENAI_MODEL
+        value: google/gemini-2.0-flash-001
+      - key: DATABASE_URL
+        fromDatabase:
+          name: oqa-db
+          property: connectionString
+
+databases:
+  - name: oqa-db
+    databaseName: oqa
+    user: oqa

@@ -41,7 +41,7 @@
                 <tbody>
                     {% for row in question_rows %}
                     <tr>
-                        <td>{{ row['question'] }}</td>
+                        <td class="question-text">{{ row['question'] }}</td>
                         <td>
                             {% if row['status'] == 'correct' %}
                             <span class="badge bg-success">Correct</span>

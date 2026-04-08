@@ -21,6 +21,24 @@
         <p>Showing quizzes for your department: <strong>{{ student_department }}</strong></p>
     </div>
 
+    {% if practice_stats %}
+    <div class="glass-card p-4 mb-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+            <div>
+                <h5 class="mb-1">Practice Progress</h5>
+                <div class="text-muted">Solved {{ practice_stats.solved_count }} of {{ practice_stats.total_available }} quizzes</div>
+            </div>
+            <div class="text-end">
+                <div class="h4 mb-0">{{ practice_stats.solved_pct }}%</div>
+                <div class="text-muted">Completion</div>
+            </div>
+        </div>
+        <div class="progress" role="progressbar" aria-valuenow="{{ practice_stats.solved_pct }}" aria-valuemin="0" aria-valuemax="100" style="height: 10px;">
+            <div class="progress-bar bg-success" style="width: {{ practice_stats.solved_pct }}%"></div>
+        </div>
+    </div>
+    {% endif %}
+
     {% with messages = get_flashed_messages() %}
     {% if messages %}
     <div class="alert alert-info">{{ messages[-1] }}</div>
@@ -53,7 +71,7 @@
         {% endfor %}
     </div>
     {% else %}
-    <div class="glass-card p-4">No practice quizzes available.</div>
+    <div class="glass-card p-4">No Practice Quizzes Available For Your Department.</div>
     {% endif %}
 </div>
 </body>

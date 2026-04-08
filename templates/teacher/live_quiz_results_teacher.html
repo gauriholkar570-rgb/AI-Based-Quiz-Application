@@ -162,7 +162,7 @@
                     {% for q in question_stats %}
                     {% set correct_rate = (q['correct_count'] / q['attempts']) if q['attempts'] else 0 %}
                     <tr style="background-color: {% if correct_rate >= 0.8 %}#e9f7ef{% elif correct_rate >= 0.5 %}#fff7e6{% else %}#fdecea{% endif %};">
-                        <td>{{ q['question_text'] }}</td>
+                        <td class="question-text">{{ q['question_text'] }}</td>
                         <td>{{ q['attempts'] }}</td>
                         <td>{{ q['correct_count'] }}</td>
                         <td>{{ q['incorrect_count'] }}</td>

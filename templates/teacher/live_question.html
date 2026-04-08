@@ -95,7 +95,7 @@
         <div class="d-flex align-items-center gap-2">
             <span class="chip">Session #{{ session_id }}</span>
             {% if question %}
-            <span class="chip">Time Left: <span id="timeLeft">{{ question['time_left'] }}</span>s</span>
+            <span class="chip" id="timerBadge">Time Left: <span id="timeLeft">{{ question['time_left'] }}</span>s</span>
             {% endif %}
         </div>
     </div>
@@ -107,9 +107,9 @@
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <span class="stat-badge">Question {{ question['question_number'] }} of {{ total_questions }}</span>
         </div>
-        <h2 class="mb-3">{{ question['question_text'] }}</h2>
+        <h2 class="mb-3 question-text">{{ question['question_text'] }}</h2>
         {% if question['media_url'] %}
-        <img class="question-media mb-3" src="{{ url_for('static', filename=question['media_url']) }}" alt="Question image">
+        <img class="question-media mb-3" src="{{ media_url(question['media_url']) }}" alt="Question image">
         {% endif %}
 
         <div id="resultBoard" class="result-board mb-3 {% if question['phase'] != 'reveal' %}d-none{% endif %}">
@@ -161,12 +161,16 @@
 {% if question %}
 <script>
 let timeLeft = {{ question['time_left'] }};
+const timeLimit = {{ question['time_limit'] }};
+let introRemaining = {{ question['intro_remaining'] }};
 const options = document.querySelectorAll(".opt");
 const resultBoard = document.getElementById("resultBoard");
 const controls = document.getElementById("controls");
 const revealBanner = document.getElementById("revealBanner");
 const timerEl = document.getElementById("timeLeft");
 let revealed = {{ 'true' if question['phase'] == 'reveal' else 'false' }};
+const optionsBox = document.getElementById("optionsBox");
+const timerBadge = document.getElementById("timerBadge");
 
 function updateReveal() {
   options.forEach((el) => {
@@ -181,11 +185,33 @@ function updateReveal() {
   controls.classList.remove("d-none");
   revealBanner.classList.remove("d-none");
   resultBoard.classList.remove("d-none");
+  optionsBox.classList.remove("d-none");
   revealed = true;
+}
+
+function updateIntroVisibility() {
+  if (revealed) {
+    optionsBox.classList.remove("d-none");
+    timerBadge.classList.remove("d-none");
+    return;
+  }
+  if (!Number.isFinite(Number(timeLimit)) || Number(timeLimit) <= 0) {
+    optionsBox.classList.remove("d-none");
+    timerBadge.classList.remove("d-none");
+    return;
+  }
+  const showOptions = introRemaining <= 0;
+  optionsBox.classList.toggle("d-none", !showOptions);
+  timerBadge.classList.toggle("d-none", !showOptions);
 }
 
 function tickTimer() {
   if (revealed) return;
+  if (introRemaining > 0) {
+    introRemaining -= 1;
+    updateIntroVisibility();
+    return;
+  }
   if (timeLeft > 0) {
     timeLeft -= 1;
     timerEl.innerText = timeLeft;
@@ -216,7 +242,9 @@ setInterval(tickTimer, 1000);
 setInterval(fetchCounts, 1600);
 fetchCounts();
 if (revealed) updateReveal();
+updateIntroVisibility();
 </script>
 {% endif %}
 </body>
 </html>
+

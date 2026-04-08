@@ -12,6 +12,7 @@ body { background:#74b9ff; font-family:'Segoe UI',sans-serif; }
 .btn-option { background:#fd79a8; color:#fff; margin-top:10px; width:100%; font-size:1rem; }
 .btn-option:hover { background:#e84393; }
 .timer { font-size:1.2rem; font-weight:bold; text-align:right; color:#2d3436; }
+.question-text { white-space: pre-wrap; }
 </style>
 </head>
 <body>
@@ -24,7 +25,7 @@ body { background:#74b9ff; font-family:'Segoe UI',sans-serif; }
     <form id="quizForm" method="POST" action="/submit_answer/{{ session_id }}">
         {% for q in quiz_questions %}
         <div class="card" id="question-{{ loop.index0 }}" {% if loop.index0 != 0 %}style="display:none"{% endif %}>
-            <h5>{{ q.question_text }}</h5>
+            <h5 class="question-text">{{ q.question_text }}</h5>
             {% for opt in q.options %}
             <button type="button" class="btn btn-option" onclick="selectOption({{ loop.index0 }}, {{ opt.id }})">{{ opt.text }}</button>
             {% endfor %}

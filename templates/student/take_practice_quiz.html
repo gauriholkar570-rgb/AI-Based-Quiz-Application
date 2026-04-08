@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
 <style>
 :root{--ink:#0f172a;--muted:#64748b;--card:#fff;--stroke:#dbeafe;--brand:#0284c7;--brand-2:#0f766e;--ok:#16a34a;}
 body{margin:0;font-family:'Manrope',sans-serif;color:var(--ink);background:radial-gradient(1100px 420px at 0% 0%,#d1fae5 0,transparent 58%),radial-gradient(900px 400px at 100% 0%,#bae6fd 0,transparent 55%),linear-gradient(180deg,#f5fbff,#f8fcff);} 
@@ -28,6 +29,7 @@ body{margin:0;font-family:'Manrope',sans-serif;color:var(--ink);background:radia
   border:1px solid #e2e8f0;
   display:block;
 }
+.question-text{white-space:pre-wrap;}
 .progress-pill{display:inline-block;background:#f0f9ff;color:#075985;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700}
 .btn-submit{background:var(--ok);border:none;font-weight:800;padding:11px}
 .btn-submit:hover{background:#15803d}
@@ -61,9 +63,9 @@ body.no-copy{
     <div class="qcard card">
       <div class="card-body">
         <div class="qhead">Question {{ loop.index }} of {{ questions|length }}</div>
-        <h5 class="mb-2">{{ item.question['question_text'] }}</h5>
+        <h5 class="mb-2 question-text">{{ item.question['question_text'] }}</h5>
         {% if item.question['media_url'] %}
-        <img class="question-media mb-3" src="{{ url_for('static', filename=item.question['media_url']) }}" alt="Question image">
+        <img class="question-media mb-3" src="{{ media_url(item.question['media_url']) }}" alt="Question image">
         {% endif %}
         {% for opt in item.options %}
         <label class="opt" for="opt_{{ opt['option_id'] }}">
@@ -80,7 +82,27 @@ body.no-copy{
   <div class="alert alert-warning">No questions found in this quiz.</div>
   {% endif %}
 </div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js"></script>
 <script>
+const quizForm = document.getElementById('quizForm');
+if (quizForm) {
+  quizForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    Swal.fire({
+      title: 'Submit Quiz?',
+      text: 'Once submitted, your answers will be saved.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Submit',
+      cancelButtonText: 'Review Again'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        quizForm.submit();
+      }
+});
+});
+}
+
 // Basic anti-copy controls for practice attempt screen
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('copy', (e) => e.preventDefault());
@@ -108,3 +130,4 @@ document.querySelectorAll('.opt input[type="radio"]').forEach((radio)=>{
 </script>
 </body>
 </html>
+

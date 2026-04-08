@@ -52,22 +52,69 @@
             </div>
             {% endif %}
 
-            <div class="quiz-editor-card mb-3">
-                <h6 class="mb-3">Generate Questions with AI</h6>
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-7">
-                        <label class="form-label">Topic</label>
-                        <input type="text" id="aiTopic" class="form-control" placeholder="Example: Python loops">
+            <div class="glass-card p-4 mb-4">
+                <h5 class="mb-3">🤖 AI Question Generator</h5>
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label" for="ai_topic">Topic</label>
+                        <input type="text" class="form-control" id="ai_topic" placeholder="e.g., Photosynthesis, Quadratic Equations, World War II">
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label">No. of Questions</label>
-                        <input type="number" id="aiCount" class="form-control" min="1" max="20" value="5">
+                    <div class="col-md-2">
+                        <label class="form-label" for="ai_num_questions">Number of Questions</label>
+                        <select class="form-select" id="ai_num_questions">
+                            <option value="1">1</option>
+                            <option value="3">3</option>
+                            <option value="5" selected>5</option>
+                            <option value="10">10</option>
+                            <option value="15">15</option>
+                            <option value="20">20</option>
+                        </select>
                     </div>
-                    <div class="col-md-2 d-grid">
-                        <button type="button" id="aiGenerateBtn" class="btn btn-outline-success">Generate</button>
+                    <div class="col-md-2">
+                        <label class="form-label" for="ai_difficulty">Difficulty</label>
+                        <select class="form-select" id="ai_difficulty">
+                            <option value="easy">Easy</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-primary w-100" id="generate_btn">
+                            <span id="btn_text">Generate Questions</span>
+                        </button>
+                    </div>
+                    <div class="col-md-2">
+                        <small class="text-muted" id="ai_status"></small>
                     </div>
                 </div>
-                <div id="aiStatus" class="small mt-2 text-muted"></div>
+                <div class="row g-3 mt-1">
+                    <div class="col-md-8">
+                        <label class="form-label" for="ai_notes">Notes / Text (optional)</label>
+                        <textarea class="form-control" id="ai_notes" rows="3" placeholder="Paste your notes here to generate questions from your content."></textarea>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="ai_notes_file">Attach Notes File (.txt, .docx, .pdf)</label>
+                        <input type="file" class="form-control" id="ai_notes_file" accept=".txt,.docx,.pdf">
+                        <small class="text-muted">Optional</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card p-4 mb-4">
+                <h5 class="mb-3">Import MCQ File</h5>
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-8">
+                        <label class="form-label" for="mcq_file">MCQ File (.csv, .json, .xlsx, .txt, .docx, .pdf)</label>
+                        <input type="file" class="form-control" id="mcq_file" accept=".csv,.json,.xlsx,.txt,.docx,.pdf">
+                        <small class="text-muted">Columns: question, option_a, option_b, option_c, option_d, correct_option, explanation (optional)</small>
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button type="button" class="btn btn-outline-primary" id="mcq_import_btn">Import MCQ</button>
+                    </div>
+                    <div class="col-md-2">
+                        <small class="text-muted" id="mcq_status"></small>
+                    </div>
+                </div>
             </div>
             
             <div id="questions" class="d-grid gap-3"></div>
@@ -118,7 +165,7 @@ function addQuestionCard(prefill) {
     div.className = "quiz-editor-card";
     div.innerHTML = `
         <h6 class="mb-3">Question ${index + 1}</h6>
-        <input type="text" name="question[]" class="form-control mb-2" placeholder="Enter question" value="${questionText}" required>
+        <textarea name="question[]" class="form-control mb-2" rows="3" placeholder="Enter question" required>${questionText}</textarea>
         <input type="file" name="question_image[]" class="form-control mb-2" accept="image/*">
         ${timerField}
 
@@ -144,30 +191,35 @@ function addQuestionCard(prefill) {
 }
 
 async function generateWithAI() {
-    const btn = document.getElementById("aiGenerateBtn");
-    const status = document.getElementById("aiStatus");
-    const topic = (document.getElementById("aiTopic").value || "").trim();
-    const count = parseInt(document.getElementById("aiCount").value || "5", 10);
+    const btn = document.getElementById("generate_btn");
+    const btnText = document.getElementById("btn_text");
+    const status = document.getElementById("ai_status");
+    const topic = (document.getElementById("ai_topic").value || "").trim();
+    const count = parseInt(document.getElementById("ai_num_questions").value || "5", 10);
+    const difficulty = document.getElementById("ai_difficulty").value;
+    const notesText = (document.getElementById("ai_notes").value || "").trim();
+    const notesFile = document.getElementById("ai_notes_file").files[0];
 
-    if (!topic) {
-        status.className = "small mt-2 text-danger";
-        status.textContent = "Topic टाका.";
+    if (!topic && !notesText && !notesFile) {
+        status.textContent = "Enter topic or provide notes/text/file.";
         return;
     }
 
     btn.disabled = true;
-    btn.textContent = "Generating...";
-    status.className = "small mt-2 text-muted";
-    status.textContent = "AI questions तयार होत आहेत...";
+    btnText.textContent = "Generating...";
+    status.textContent = "Generating questions...";
 
     try {
+        const formData = new FormData();
+        formData.append("topic", topic);
+        formData.append("num_questions", Number.isFinite(count) ? count : 5);
+        formData.append("difficulty", difficulty);
+        formData.append("notes_text", notesText);
+        if (notesFile) formData.append("notes_file", notesFile);
+
         const resp = await fetch("/api/ai/generate-questions", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                topic: topic,
-                num_questions: Number.isFinite(count) ? count : 5
-            })
+            body: formData
         });
         const data = await resp.json();
         if (!resp.ok || !data.ok) {
@@ -179,14 +231,83 @@ async function generateWithAI() {
         index = 0;
         (data.questions || []).forEach((q) => addQuestionCard(q));
 
-        status.className = "small mt-2 text-success";
         status.textContent = `${(data.questions || []).length} questions generated successfully.`;
+        document.getElementById("ai_topic").value = "";
+        document.getElementById("ai_notes").value = "";
+        document.getElementById("ai_notes_file").value = "";
     } catch (err) {
-        status.className = "small mt-2 text-danger";
         status.textContent = err.message || "AI generation failed.";
     } finally {
         btn.disabled = false;
-        btn.textContent = "Generate";
+        btnText.textContent = "Generate Questions";
+        setTimeout(() => { status.textContent = ""; }, 5000);
+    }
+}
+
+function addImportedQuestions(questions) {
+    const cards = Array.from(document.querySelectorAll("#questions .quiz-editor-card"));
+    const isFieldBlank = (el) => {
+        if (!el) return true;
+        const v = (el.value || "").trim();
+        if (!v) return true;
+        const ph = el.getAttribute("placeholder");
+        return ph ? v === ph.trim() : false;
+    };
+    const isCardEmpty = (card) => {
+        const qInput = card.querySelector('textarea[name="question[]"]');
+        const qBlank = isFieldBlank(qInput);
+        const optionInputs = card.querySelectorAll('input[type="text"][name^="option_"]');
+        const optionsEmpty = Array.from(optionInputs).every((inp) => isFieldBlank(inp));
+        return qBlank && optionsEmpty;
+    };
+    let emptyCards = cards.filter(isCardEmpty);
+    (questions || []).forEach((q) => {
+        let card = emptyCards.shift();
+        if (!card) {
+            addQuestionCard(q);
+            return;
+        }
+        const qInput = card.querySelector('textarea[name="question[]"]');
+        if (qInput) qInput.value = q.question;
+        q.options.forEach((optText, idx) => {
+            const optLabel = ["A","B","C","D"][idx];
+            const optInput = card.querySelector(`input[name^="option_${optLabel.toLowerCase()}"]`);
+            if (optInput) optInput.value = optText;
+        });
+        const correctRadio = card.querySelector(`input[type="radio"][value="${q.correct_option}"]`);
+        if (correctRadio) correctRadio.checked = true;
+    });
+}
+
+async function importMcqFile() {
+    const fileInput = document.getElementById("mcq_file");
+    const status = document.getElementById("mcq_status");
+    const btn = document.getElementById("mcq_import_btn");
+    const file = fileInput.files[0];
+
+    if (!file) {
+        status.textContent = "Attach an MCQ file.";
+        return;
+    }
+
+    btn.disabled = true;
+    status.textContent = "Importing...";
+    try {
+        const formData = new FormData();
+        formData.append("mcq_file", file);
+        const resp = await fetch("/api/quiz/import-mcq", { method: "POST", body: formData });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) {
+            throw new Error(data.error || "Failed to import MCQ file.");
+        }
+        addImportedQuestions(data.questions || []);
+        status.textContent = `Imported ${data.questions.length} questions.`;
+        fileInput.value = "";
+    } catch (err) {
+        status.textContent = err.message || "MCQ import failed.";
+    } finally {
+        btn.disabled = false;
+        setTimeout(() => { status.textContent = ""; }, 5000);
     }
 }
 
@@ -199,7 +320,8 @@ document.querySelector('form').addEventListener('submit', function(e) {
     }
 });
 
-document.getElementById("aiGenerateBtn").addEventListener("click", generateWithAI);
+document.getElementById("generate_btn").addEventListener("click", generateWithAI);
+document.getElementById("mcq_import_btn").addEventListener("click", importMcqFile);
 addQuestion();
 </script>
 

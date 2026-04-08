@@ -123,7 +123,7 @@
 
 <div class="page-wrap" style="max-width:920px;">
   <div class="glass-card p-4">
-    <h2 id="questionBox" class="mb-3">Quiz will start shortly.</h2>
+    <h2 id="questionBox" class="mb-3 question-text">Quiz will start shortly.</h2>
     <img id="questionImage" class="question-media d-none mb-3" alt="Question image">
     <div id="feedbackBox"></div>
     <div id="optionsBox" class="option-grid"></div>
@@ -134,13 +134,13 @@
 const sessionId = {{ session_id|tojson }};
 const playerName = {{ player_name|tojson }};
 const optionClasses = ["c1", "c2", "c3", "c4"];
-
 let currentQuestionId = null;
 let selectedAnswer = null;
 let submittedThisQuestion = false;
 let quizEnded = false;
 let pollTimer = null;
 let lastSubmissionMeta = null;
+let introTimer = null;
 
 function esc(text) {
   return String(text || "").replace(/[&<>\"']/g, (s) => ({
@@ -163,7 +163,11 @@ function rankLabel(rank) {
 
 function showQuestionView() {
   document.getElementById("questionBox").classList.remove("d-none");
-  document.getElementById("optionsBox").classList.remove("d-none");
+}
+
+function setOptionsVisibility(show) {
+  const box = document.getElementById("optionsBox");
+  box.classList.toggle("d-none", !show);
 }
 
 function showFeedbackOnlyView() {
@@ -222,6 +226,7 @@ function renderWaiting(text) {
   document.getElementById("feedbackBox").innerHTML = "";
   document.getElementById("timerBadge").classList.add("d-none");
   showQuestionView();
+  setOptionsVisibility(false);
 }
 
 function disableOptions() {
@@ -233,13 +238,12 @@ function renderQuestion(data) {
   document.getElementById("questionBox").innerText = data.question_text;
   const img = document.getElementById("questionImage");
   if (data.media_url) {
-    img.src = `/static/${data.media_url}`;
+    img.src = data.media_url;
     img.classList.remove("d-none");
   } else {
     img.classList.add("d-none");
     img.removeAttribute("src");
   }
-  document.getElementById("timerBadge").classList.remove("d-none");
   document.getElementById("timeLeft").innerText = data.time_left;
 
   const optionsBox = document.getElementById("optionsBox");
@@ -257,6 +261,31 @@ function renderQuestion(data) {
     btn.addEventListener("click", () => submitAnswer(optText, btn));
     optionsBox.appendChild(btn);
   });
+
+  if (introTimer) {
+    clearTimeout(introTimer);
+    introTimer = null;
+  }
+  const timeLimit = Number(data.time_limit || 0);
+  const timeLeft = Number(data.time_left || 0);
+  const introRemaining = Number(data.intro_remaining || 0);
+  const hasTimer = Number.isFinite(timeLimit) && timeLimit > 0;
+  if (data.phase === "question" && introRemaining > 0) {
+    setOptionsVisibility(false);
+    document.getElementById("timerBadge").classList.add("d-none");
+    const revealForId = data.question_id;
+    introTimer = setTimeout(() => {
+      if (currentQuestionId === revealForId && !quizEnded && !submittedThisQuestion) {
+        setOptionsVisibility(true);
+        document.getElementById("timerBadge").classList.remove("d-none");
+      }
+    }, introRemaining * 1000);
+  } else {
+    setOptionsVisibility(true);
+    if (hasTimer) {
+      document.getElementById("timerBadge").classList.remove("d-none");
+    }
+  }
 
   if (data.phase === "question" && data.your_submitted) {
     submittedThisQuestion = true;
@@ -412,3 +441,4 @@ pollState();
 </script>
 </body>
 </html>
+

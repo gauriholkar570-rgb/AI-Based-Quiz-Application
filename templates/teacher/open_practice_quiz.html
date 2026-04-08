@@ -40,6 +40,7 @@ body {
     color: #28a745;
     font-weight: bold;
 }
+.question-text{white-space:pre-wrap;}
 h1 { color: #667eea; margin-bottom: 10px; }
 .quiz-meta { color: #666; margin-bottom: 20px; }
 .btn-back { margin-top: 20px; }
@@ -63,7 +64,7 @@ h1 { color: #667eea; margin-bottom: 10px; }
     {% if questions %}
         {% for item in questions %}
         <div class="question-card">
-            <h5 class="mb-3">
+            <h5 class="mb-3 question-text">
                 <span class="badge bg-primary">Q{{ loop.index }}</span>
                 {{ item.question.question_text }}
             </h5>
@@ -92,3 +93,4 @@ h1 { color: #667eea; margin-bottom: 10px; }
 
 </body>
 </html>
+
