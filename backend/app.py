@@ -4916,10 +4916,14 @@ def student_practice_quizzes():
         ).fetchone()
         student_department = student_department_row['department'] if student_department_row else 'Computer'
 
+            # १. LIKE सर्चसाठी व्हॅल्यू आधीच तयार करा
+    dept_filter = f"%,{student_department},%"
+
+    # २. मुख्य क्वेरी (रिप्लेस करा)
         quizzes = conn.execute("""
             SELECT
-                p.quiz_id,
-                p.quiz_name,
+             p.quiz_id,
+             p.quiz_name,
                 p.description,
                 p.created_at,
                 COALESCE(u.username, 'Teacher') AS teacher_name,
@@ -4940,10 +4944,14 @@ def student_practice_quizzes():
             WHERE (',' || COALESCE(
                 NULLIF(p.target_departments, ''),
                 COALESCE(NULLIF(p.department, ''), COALESCE(NULLIF(u.department, ''), 'Computer'))
-            ) || ',') LIKE '%,' || ? || ',%'
-              GROUP BY p.quiz_id
-              ORDER BY p.quiz_id DESC
-          """, (session['user_id'], student_department)).fetchall()
+            ) || ',') LIKE ?
+            GROUP BY 
+                p.quiz_id, p.quiz_name, p.description, p.created_at, 
+                u.username, p.target_departments, p.department, u.department,
+                pp.score, pp.correct_answers, pp.total_questions, pp.completed_at
+            ORDER BY p.quiz_id DESC
+        """, (session['user_id'], dept_filter)).fetchall()
+
 
         total_available = conn.execute(
             """
