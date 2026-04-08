@@ -4958,15 +4958,17 @@ def student_practice_quizzes():
         """, (dept_search_str,)).fetchone()
         total_available = total_res["total"] if total_res else 0
 
-        solved_count = conn.execute(
+        solved_res = conn.execute(
             """
             SELECT COUNT(*) AS total
             FROM PracticeFirstAttempts
-            WHERE user_id=?
+            WHERE user_id = ?
             """,
             (session['user_id'],)
-        ).fetchone()["total"]
-
+        ).fetchone()
+        
+        # जर निकाल मिळाला नाही तर 0 सेट करा
+        solved_count = solved_res["total"] if solved_res else 0
     solved_pct = round((solved_count / total_available) * 100, 1) if total_available else 0
     practice_stats = {
         "total_available": total_available,
