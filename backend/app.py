@@ -5481,10 +5481,10 @@ def add_study_note():
         conn.execute(
             """
             INSERT INTO StudyNotes (user_id, title, content, created_at, updated_at)
-            VALUES (?, ?, ?, current_datetime, current_datetime)
-            """,
-            (session['user_id'], title, content)
-        )
+            VALUES (%s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        (session['user_id'], title, content)
+    )
     flash("Note saved.")
     return redirect(url_for('student_study_tools'))
 
