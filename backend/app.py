@@ -4914,55 +4914,54 @@ def student_practice_quizzes():
         student_department = student_department_row['department'] if student_department_row else 'Computer'
 
            
-        dept_filter = f"%,{student_department},%"
+            # १. सर्च पॅरामीटर बाहेर तयार करा
+        dept_search_str = f"%,{student_department},%"
 
-    
-         quizzes = conn.execute("""
-        SELECT
-            p.quiz_id,
-            p.quiz_name,
-            p.description,
-            p.created_at,
-            COALESCE(u.username, 'Teacher') AS teacher_name,
-            COALESCE(
+        quizzes = conn.execute("""
+            SELECT
+                p.quiz_id,
+                p.quiz_name,
+                p.description,
+                p.created_at,
+                COALESCE(u.username, 'Teacher') AS teacher_name,
+                COALESCE(
+                    NULLIF(p.target_departments, ''),
+                    COALESCE(NULLIF(p.department, ''), COALESCE(NULLIF(u.department, ''), 'Computer'))
+                ) AS quiz_departments,
+                COUNT(DISTINCT q.question_id) AS total_questions,
+                pp.score AS last_score,
+                pp.correct_answers AS last_correct,
+                pp.total_questions AS last_total,
+                pp.completed_at
+            FROM Practice_Quizzes p
+            LEFT JOIN Users u ON p.created_by = u.user_id
+            LEFT JOIN PracticeQuestions q ON p.quiz_id = q.quiz_id
+            LEFT JOIN PracticeProgress pp
+                ON pp.quiz_id = p.quiz_id AND pp.user_id = ?
+            WHERE (',' || COALESCE(
                 NULLIF(p.target_departments, ''),
                 COALESCE(NULLIF(p.department, ''), COALESCE(NULLIF(u.department, ''), 'Computer'))
-            ) AS quiz_departments,
-            COUNT(DISTINCT q.question_id) AS total_questions,
-            pp.score AS last_score,
-            pp.correct_answers AS last_correct,
-            pp.total_questions AS last_total,
-            pp.completed_at
-        FROM Practice_Quizzes p
-        LEFT JOIN Users u ON p.created_by = u.user_id
-        LEFT JOIN PracticeQuestions q ON p.quiz_id = q.quiz_id
-        LEFT JOIN PracticeProgress pp
-            ON pp.quiz_id = p.quiz_id AND pp.user_id = ?
-        WHERE (',' || COALESCE(
-            NULLIF(p.target_departments, ''),
-            COALESCE(NULLIF(p.department, ''), COALESCE(NULLIF(u.department, ''), 'Computer'))
-        ) || ',') LIKE ?
-        GROUP BY 
-            p.quiz_id, p.quiz_name, p.description, p.created_at, 
-            u.username, p.target_departments, p.department, u.department,
-            pp.score, pp.correct_answers, pp.total_questions, pp.completed_at
-        ORDER BY p.quiz_id DESC
-    """, (session['user_id'], dept_filter)).fetchall()
+            ) || ',') LIKE ?
+            GROUP BY 
+                p.quiz_id, p.quiz_name, p.description, p.created_at, 
+                u.username, p.target_departments, p.department, u.department,
+                pp.score, pp.correct_answers, pp.total_questions, pp.completed_at
+            ORDER BY p.quiz_id DESC
+        """, (session['user_id'], dept_search_str)).fetchall()
 
-
-
+    
         total_res = conn.execute(
-        """
-        SELECT COUNT(*) AS total
-        FROM Practice_Quizzes p
-        LEFT JOIN Users u ON p.created_by = u.user_id
-        WHERE (',' || COALESCE(
-            NULLIF(p.target_departments, ''),
-            COALESCE(NULLIF(p.department, ''), COALESCE(NULLIF(u.department, ''), 'Computer'))
-        ) || ',') LIKE ?
-        """,
-        (dept_filter,)
-    ).fetchone()
+            """
+            SELECT COUNT(*) AS total
+            FROM Practice_Quizzes p
+            LEFT JOIN Users u ON p.created_by = u.user_id
+            WHERE (',' || COALESCE(
+                NULLIF(p.target_departments, ''),
+                COALESCE(NULLIF(p.department, ''), COALESCE(NULLIF(u.department, ''), 'Computer'))
+            ) || ',') LIKE ?
+            """,
+            (dept_search_str,)
+        ).fetchone()
         total_available = total_res["total"] if total_res else 0
 
         solved_count = conn.execute(
