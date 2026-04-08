@@ -7029,7 +7029,8 @@ _db_initialized = False
 # ---------------- RUN APP ----------------
 if __name__ == '__main__':
     if USE_POSTGRES:
-        init_db()
+        #init_db()
+        pass
     else:
         migrate_practice_tables()
         init_practice_table()
