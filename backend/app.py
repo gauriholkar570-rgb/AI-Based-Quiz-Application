@@ -7018,6 +7018,8 @@ _db_initialized = False
 #def _ensure_db_initialized():
     #global _db_initialized
     #if _db_initialized:
+        #pass
+    
      #   return
     #if USE_POSTGRES:
      #   init_db()
