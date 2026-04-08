@@ -7016,17 +7016,15 @@ _db_initialized = False
 
 #@app.before_request
 #def _ensure_db_initialized():
-    #global _db_initialized
-    #if _db_initialized:
-        #pass
-    
-     #   return
-    #if USE_POSTGRES:
-     #   init_db()
-    #else:
-     #   migrate_practice_tables()
-      #  init_practice_table()
-    _#db_initialized = True
+#    global _db_initialized
+#    if _db_initialized:
+#        return
+#    if USE_POSTGRES:
+#        init_db()
+#    else:
+#        migrate_practice_tables()
+#       init_practice_table()
+#   _db_initialized = True
 
 # ---------------- RUN APP ----------------
 if __name__ == '__main__':
