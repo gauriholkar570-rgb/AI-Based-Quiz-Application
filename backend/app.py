@@ -1518,7 +1518,7 @@ CREATE TABLE IF NOT EXISTS Options(
             ]
             conn.executemany("""
                 INSERT INTO DailyTips (content_text, content_type, subject, difficulty_level, language, is_active, publish_date)
-                VALUES (?, ?, ?, ?, ?, 1, date('now'))
+                VALUES (?, ?, ?, ?, ?, 1, current_date)
             """, sample_tips)
 
         multilingual_tips = [
@@ -1537,7 +1537,7 @@ CREATE TABLE IF NOT EXISTS Options(
             if not exists:
                 conn.execute("""
                     INSERT INTO DailyTips (content_text, content_type, subject, difficulty_level, language, is_active, publish_date)
-                    VALUES (?, ?, ?, ?, ?, 1, date('now'))
+                    VALUES (?, ?, ?, ?, ?, 1, current_date)
                 """, tip)
 
 
@@ -5481,7 +5481,7 @@ def add_study_note():
         conn.execute(
             """
             INSERT INTO StudyNotes (user_id, title, content, created_at, updated_at)
-            VALUES (?, ?, ?, datetime('now'), datetime('now'))
+            VALUES (?, ?, ?, current_datetime, current_datetime)
             """,
             (session['user_id'], title, content)
         )
