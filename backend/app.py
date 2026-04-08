@@ -42,11 +42,8 @@ client = OpenAI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 template_dir = os.path.join(BASE_DIR, 'templates')
 static_dir = os.path.join(BASE_DIR, 'static')
-app = Flask(
-    __name__,
-    template_folder=template_dir,
-    static_folder="static"
-)
+app = Flask(__name__, template_folder=template_dir, static_folder="static")
+
 
 
 basedir = os.path.abspath(os.path.dirname(__file__))
