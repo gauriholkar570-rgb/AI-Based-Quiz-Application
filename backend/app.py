@@ -1541,7 +1541,7 @@ CREATE TABLE IF NOT EXISTS Options(
                 """, tip)
 
 
-#init_db()
+init_db()
 
 # ---------------- PASSWORD CHECK ----------------
 def is_password_strong(p):
