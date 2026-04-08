@@ -4913,8 +4913,6 @@ def student_practice_quizzes():
         ).fetchone()
         student_department = student_department_row['department'] if student_department_row else 'Computer'
 
-           
-            # १. सर्च पॅरामीटर बाहेर तयार करा
         dept_search_str = f"%,{student_department},%"
 
         quizzes = conn.execute("""
@@ -4948,10 +4946,8 @@ def student_practice_quizzes():
                 pp.score, pp.correct_answers, pp.total_questions, pp.completed_at
             ORDER BY p.quiz_id DESC
         """, (session['user_id'], dept_search_str)).fetchall()
-
     
-        total_res = conn.execute(
-            """
+        total_res = conn.execute("""
             SELECT COUNT(*) AS total
             FROM Practice_Quizzes p
             LEFT JOIN Users u ON p.created_by = u.user_id
@@ -4959,9 +4955,7 @@ def student_practice_quizzes():
                 NULLIF(p.target_departments, ''),
                 COALESCE(NULLIF(p.department, ''), COALESCE(NULLIF(u.department, ''), 'Computer'))
             ) || ',') LIKE ?
-            """,
-            (dept_search_str,)
-        ).fetchone()
+        """, (dept_search_str,)).fetchone()
         total_available = total_res["total"] if total_res else 0
 
         solved_count = conn.execute(
